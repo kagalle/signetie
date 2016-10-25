@@ -6,6 +6,7 @@
 package org.rainshowers.signetie;
 
 import java.util.Arrays;
+import javax.crypto.SecretKey;
 import javax.xml.bind.DatatypeConverter;
 
 /**
@@ -15,25 +16,25 @@ import javax.xml.bind.DatatypeConverter;
  * @author Ken Galle <ken@rainshowers.org>
  */
 public class PasswordHash {
-    private byte[] hash;
+    private SecretKey key;
     private byte[] salt;
     private int interationCount;
 
     public PasswordHash() {
     }
 
-    public PasswordHash(byte[] hash, byte[] salt, int interationCount) {
-        this.hash = hash;
+    public PasswordHash(SecretKey key, byte[] salt, int interationCount) {
+        this.key = key;
         this.salt = salt;
         this.interationCount = interationCount;
     }
 
-    public byte[] getHash() {
-        return hash;
+    public SecretKey getKey() {
+        return key;
     }
 
-    public void setHash(byte[] hash) {
-        this.hash = hash;
+    public void setKey(SecretKey key) {
+        this.key = key;
     }
 
     public byte[] getSalt() {
@@ -57,7 +58,7 @@ public class PasswordHash {
      * output hash.
      */
     public int getHashLength() {
-        return hash.length;
+        return key.getEncoded().length;
     }
 
     /**
@@ -76,7 +77,7 @@ public class PasswordHash {
     @Override
     public int hashCode() {
         int hash = 3;
-        hash = 71 * hash + Arrays.hashCode(this.hash);
+        hash = 71 * hash + Arrays.hashCode(this.key.getEncoded());
         hash = 71 * hash + Arrays.hashCode(this.salt);
         hash = 71 * hash + this.interationCount;
         return hash;
@@ -98,7 +99,7 @@ public class PasswordHash {
         if (this.interationCount != other.interationCount) {
             return false;
         }
-        if (!Arrays.equals(this.hash, other.hash)) {
+        if (!Arrays.equals(this.key.getEncoded(), other.key.getEncoded())) {
             return false;
         }
         if (!Arrays.equals(this.salt, other.salt)) {

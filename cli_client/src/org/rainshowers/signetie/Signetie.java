@@ -36,56 +36,68 @@ public class Signetie {
     /**
      * @param args the command line arguments
      */
-    public static void main(String[] args) {
-        try {
-            // TODO code application logic here
-            createPkcs8();
-        } catch (NoSuchAlgorithmException | IOException | IllegalBlockSizeException | BadPaddingException | NoSuchPaddingException | InvalidKeySpecException | InvalidKeyException | InvalidAlgorithmParameterException | InvalidParameterSpecException ex) {
-            Logger.getLogger(Signetie.class.getName()).log(Level.SEVERE, null, ex);
-        }
+    public static void main(String[] args) throws SignetieException {
+      KeyPair keyPair = generateKeyPair();
     }
 
     // based on http://stackoverflow.com/a/6164414/3728147
-    private static void createPkcs8() throws NoSuchAlgorithmException, IOException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, InvalidKeySpecException, InvalidKeyException, InvalidAlgorithmParameterException, InvalidParameterSpecException {
+    // http://stackoverflow.com/a/16586921/3728147
+    // http://www.programcreek.com/java-api-examples/index.php?api=java.security.spec.PKCS8EncodedKeySpec
+    // http://snipplr.com/view/18368/
+    // http://stackoverflow.com/questions/19640735/load-public-key-data-from-file
+    // http://anandsekar.github.io/exporting-the-private-key-from-a-jks-keystore/
+    // http://www.javamex.com/tutorials/cryptography/rsa_key_length.shtml
+    // http://www.javamex.com/tutorials/cryptography/rsa_encryption.shtml
+    private static void createPkcs8() throws NoSuchAlgorithmException, IOException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, InvalidKeySpecException, InvalidKeyException, InvalidAlgorithmParameterException, InvalidParameterSpecException, SignetieException {
         // generate key pair
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-        keyPairGenerator.initialize(1024);
+        keyPairGenerator.initialize(4096);
         KeyPair keyPair = keyPairGenerator.genKeyPair();
 
         // extract the encoded private key, this is an unencrypted PKCS#8 private key
-        byte[] encodedprivkey = keyPair.getPrivate().getEncoded();
+//        byte[] encodedprivkey = keyPair.getPrivate().getEncoded();
 
         // We must use a PasswordBasedEncryption algorithm in order to encrypt the private key, you may use any common algorithm supported by openssl, you can check them in the openssl documentation http://www.openssl.org/docs/apps/pkcs8.html
-        // String MYPBEALG = "PBEWithSHA1AndDESede";
-        String MYPBEALG = "PBKDF2WithHmacSHA1";
-        String password = "pleaseChangeit!";
+//        String MYPBEALG = "PBEWithSHA1AndDESede";
+        String password = "super_secret";
 
-        int count = 20;// hash iteration count
-        SecureRandom random = new SecureRandom();
-        byte[] salt = new byte[8];
-        random.nextBytes(salt);
+//        int count = 20;// hash iteration count
+//        SecureRandom random = new SecureRandom();
+//        byte[] salt = new byte[8];
+//        random.nextBytes(salt);
 
-        // Create PBE parameter set
-        PBEParameterSpec pbeParamSpec = new PBEParameterSpec(salt, count);
-        PBEKeySpec pbeKeySpec = new PBEKeySpec(password.toCharArray());
-        SecretKeyFactory keyFac = SecretKeyFactory.getInstance(MYPBEALG);
-        SecretKey pbeKey = keyFac.generateSecret(pbeKeySpec);
+        // Create key from the password needed to encrypt the private key
+        Pbkdf2PasswordHasher instance = new Pbkdf2PasswordHasher();
+        SecretKey pbeKey = instance.generateHash(password).getKey();
 
-        Cipher pbeCipher = Cipher.getInstance(MYPBEALG);
-
-        // Initialize PBE Cipher with key and parameters
-        pbeCipher.init(Cipher.ENCRYPT_MODE, pbeKey, pbeParamSpec);
-
-        // Encrypt the encoded Private Key with the PBE key
-        byte[] ciphertext = pbeCipher.doFinal(encodedprivkey);
+        // encrypt the private key
+        Cipher c = Cipher.getInstance("RSA");
+        c.init(Cipher.WRAP_MODE, pbeKey);
+        byte[] encryptedPrivateKey = c.wrap(keyPair.getPrivate());
+        
+        
+        
+        
+        
 
         // Now construct  PKCS #8 EncryptedPrivateKeyInfo object
-        AlgorithmParameters algparms = AlgorithmParameters.getInstance(MYPBEALG);
-        algparms.init(pbeParamSpec);
-        EncryptedPrivateKeyInfo encinfo = new EncryptedPrivateKeyInfo(algparms, ciphertext);
+//        AlgorithmParameters algparms = AlgorithmParameters.getInstance(MYPBEALG);
+//        algparms.init(pbeParamSpec);
+//        EncryptedPrivateKeyInfo encinfo = new EncryptedPrivateKeyInfo(algparms, ciphertext);
 
         // and here we have it! a DER encoded PKCS#8 encrypted key!
-        byte[] encryptedPkcs8 = encinfo.getEncoded();
+//        byte[] encryptedPkcs8 = encinfo.getEncoded();
     }
-
+    private static final String GENERATE_KEYPAIR_ERROR = "Error generating key pair.";
+    public static KeyPair generateKeyPair() throws SignetieException {
+      try {
+        // generate key pair
+        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+        keyPairGenerator.initialize(4096);
+        KeyPair keyPair = keyPairGenerator.genKeyPair();
+        return keyPair;
+      } catch (NoSuchAlgorithmException ex) {
+        throw new SignetieException(GENERATE_KEYPAIR_ERROR, ex);
+      }
+    }
 }

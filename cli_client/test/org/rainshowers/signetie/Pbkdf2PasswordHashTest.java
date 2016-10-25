@@ -5,6 +5,9 @@
  */
 package org.rainshowers.signetie;
 
+import org.hamcrest.core.IsEqual;
+import org.hamcrest.core.IsNot;
+import org.junit.Assert;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -23,22 +26,15 @@ public class Pbkdf2PasswordHashTest {
         
         String password = "Super big secret";
         Pbkdf2PasswordHasher instance = new Pbkdf2PasswordHasher();
-        // Have to push the salt value in to get repeatable results
-        
-        byte[] testSalt = new byte[32];  // zero filled
         byte[] testHash = new byte[32];  // zero filled
-        int iterationCount = 100000;
-
-        PasswordHash expResult = 
-                new PasswordHash(testHash, testSalt, iterationCount);
-        
         PasswordHash result = instance.generateHash(password);
+        byte[] resultHash = result.getKey().getEncoded();
         /* 
          * The expected salt and hash can't be known. There is an infinetly 
          * small chance that the generated hash and salt will actually be the
          * expected value (all zeros), so check that it doesn't match.
          */
-        assertNotEquals(expResult, result);
+        Assert.assertThat(testHash, IsNot.not(IsEqual.equalTo(resultHash)));
         verifyDuration(instance);
         System.out.println(String.format(
                 "Duration (msec): %d", instance.getDuration()));
@@ -58,18 +54,13 @@ public class Pbkdf2PasswordHashTest {
         
         String password = "Super big secret";
         Pbkdf2PasswordHasher instance = new Pbkdf2PasswordHasher();
-        int iterationCount = 100000;
-
         // Have to push the salt value in to get repeatable results
-        PasswordHash expResult = new PasswordHash(
-                VALID_TEST_HASH, VALID_TEST_SALT, iterationCount);
-        
         PasswordHash result = instance.generateHash(password, VALID_TEST_SALT);
         /*
          * Here I specify the salt value, so I can determine ahead what the 
          * resulting hash should be.
          */
-        assertEquals(expResult, result);
+        assertArrayEquals(VALID_TEST_HASH, result.getKey().getEncoded());
         verifyDuration(instance);
         System.out.println(String.format(
                 "Duration (msec): %d", instance.getDuration()));
@@ -80,9 +71,8 @@ public class Pbkdf2PasswordHashTest {
         System.out.println("verifyHash");
         String password = "Super big secret";
 
-        int iterationCount = 100000;
-        PasswordHash passwordHash = new PasswordHash(
-                VALID_TEST_HASH, VALID_TEST_SALT, iterationCount);
+        Pbkdf2PasswordHasher instance = new Pbkdf2PasswordHasher();
+        PasswordHash passwordHash = instance.generateHash(password, VALID_TEST_SALT);
 
         boolean expResult = true;
         boolean result = Pbkdf2PasswordHasher.verifyHash(password, passwordHash);

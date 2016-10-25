@@ -61,13 +61,13 @@ public class Pbkdf2PasswordHasher implements PasswordHasher {
     public PasswordHash generateHash(String password, byte[] salt) throws SignetieException {
         long startTime = System.nanoTime();
         try {
-            byte[] hash = generateKey(password, salt, iterationCount, hashLength);
+            SecretKey secretKey = generateKey(password, salt, iterationCount, hashLength);
             // track the time it took to compute
             long endTime = System.nanoTime();
             // divide by 1e6 to convert from nanoseconds to milliseconds.
             duration = (endTime - startTime) / 1000000;
             // bundle up the result to return
-            PasswordHash passwordHash = new PasswordHash(hash, salt, iterationCount);
+            PasswordHash passwordHash = new PasswordHash(secretKey, salt, iterationCount);
             return passwordHash;
         } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
             throw new SignetieException(GENERATE_HASH_ERROR, ex);
@@ -81,11 +81,11 @@ public class Pbkdf2PasswordHasher implements PasswordHasher {
             throws SignetieException {
         try {
             // generate a hash based on the supplied password
-            byte[] verifyHash = generateKey(password, passwordHash.getSalt(),
+            SecretKey secretKey = generateKey(password, passwordHash.getSalt(),
                     passwordHash.getInterationCount(), passwordHash.getHashLength());
             // convert both old and new hashes to strings
-            String oldHashString = PasswordHash.byteArrayToString(passwordHash.getHash());
-            String newHashString = PasswordHash.byteArrayToString(verifyHash);
+            String oldHashString = PasswordHash.byteArrayToString(passwordHash.getKey().getEncoded());
+            String newHashString = PasswordHash.byteArrayToString(secretKey.getEncoded());
             // return comparison
             return oldHashString.equals(newHashString);
         } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
@@ -104,7 +104,7 @@ public class Pbkdf2PasswordHasher implements PasswordHasher {
      * @throws NoSuchAlgorithmException
      * @throws InvalidKeySpecException 
      */
-    private static byte[] generateKey(String password, byte[] salt, int iterationCount, 
+    private static SecretKey generateKey(String password, byte[] salt, int iterationCount, 
             int hashLength) throws NoSuchAlgorithmException, InvalidKeySpecException {
         
         // PBEKeySpec requires the password to be in a byte array
@@ -116,8 +116,11 @@ public class Pbkdf2PasswordHasher implements PasswordHasher {
         SecretKeyFactory skf = SecretKeyFactory.getInstance(SECRET_KEY_FACTORY_ALGORITHM);
         // generate the key and retrieve the encoded key
         SecretKey secretKey = skf.generateSecret(spec);
-        byte[] hash = secretKey.getEncoded();
-        return hash;
+
+        // System.out.println(new String(secretKey.getEncoded()));
+        System.out.println(secretKey.getFormat());
+        System.out.println(secretKey.getAlgorithm());
+        return secretKey;
     }
     
     /**
