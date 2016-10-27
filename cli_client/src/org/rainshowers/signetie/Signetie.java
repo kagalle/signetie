@@ -12,6 +12,7 @@ import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.InvalidParameterSpecException;
@@ -32,7 +33,11 @@ import javax.crypto.spec.PBEParameterSpec;
  * @author Ken Galle <ken@rainshowers.org>
  */
 public class Signetie {
-
+  private class SignetieKeyPair {
+    private Key privateKey;
+    public Key publicKey;
+    
+  }
     /**
      * @param args the command line arguments
      */
@@ -99,5 +104,23 @@ public class Signetie {
       } catch (NoSuchAlgorithmException ex) {
         throw new SignetieException(GENERATE_KEYPAIR_ERROR, ex);
       }
+    }
+ 
+    // http://stackoverflow.com/a/3985508/3728147
+    private void x() throws SignetieException, IOException {
+      KeyPair keyPair = Signetie.generateKeyPair();
+      PrivateKey privateKey = keyPair.getPrivate();
+EncryptedPrivateKeyInfo encryptPKInfo = new EncryptedPrivateKeyInfo(privateKey.getEncoded());
+
+Cipher cipher = Cipher.getInstance(encryptPKInfo.getAlgName());
+PBEKeySpec pbeKeySpec = new PBEKeySpec(passwd.toCharArray());
+SecretKeyFactory secFac = SecretKeyFactory.getInstance(encryptPKInfo.getAlgName());
+Key pbeKey = secFac.generateSecret(pbeKeySpec);
+
+AlgorithmParameters algParams = encryptPKInfo.getAlgParameters();
+cipher.init(Cipher.DECRYPT_MODE, pbeKey, algParams);
+KeySpec pkcs8KeySpec = encryptPKInfo.getKeySpec(cipher);
+KeyFactory kf = KeyFactory.getInstance("RSA");
+return kf.generatePrivate(pkcs8KeySpec);      
     }
 }
