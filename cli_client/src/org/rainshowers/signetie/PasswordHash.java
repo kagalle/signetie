@@ -19,14 +19,16 @@ public class PasswordHash {
     private SecretKey key;
     private byte[] salt;
     private int interationCount;
+    private String SecretKeyFactoryAlgorithm;
 
     public PasswordHash() {
     }
 
-    public PasswordHash(SecretKey key, byte[] salt, int interationCount) {
+    public PasswordHash(SecretKey key, byte[] salt, int interationCount, String SecretKeyFactoryAlgorithm) {
         this.key = key;
         this.salt = salt;
         this.interationCount = interationCount;
+        this.SecretKeyFactoryAlgorithm = SecretKeyFactoryAlgorithm;
     }
 
     public SecretKey getKey() {
@@ -51,6 +53,10 @@ public class PasswordHash {
 
     public void setInterationCount(int interationCount) {
         this.interationCount = interationCount;
+    }
+
+    public String getSecretKeyFactoryAlgorithm() {
+        return SecretKeyFactoryAlgorithm;
     }
 
     /**

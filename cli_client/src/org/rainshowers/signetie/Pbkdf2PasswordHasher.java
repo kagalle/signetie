@@ -67,7 +67,7 @@ public class Pbkdf2PasswordHasher implements PasswordHasher {
             // divide by 1e6 to convert from nanoseconds to milliseconds.
             duration = (endTime - startTime) / 1000000;
             // bundle up the result to return
-            PasswordHash passwordHash = new PasswordHash(secretKey, salt, iterationCount);
+            PasswordHash passwordHash = new PasswordHash(secretKey, salt, iterationCount, SECRET_KEY_FACTORY_ALGORITHM);
             return passwordHash;
         } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
             throw new SignetieException(GENERATE_HASH_ERROR, ex);
@@ -110,12 +110,12 @@ public class Pbkdf2PasswordHasher implements PasswordHasher {
         // PBEKeySpec requires the password to be in a byte array
         char[] passwordAsCharArray = password.toCharArray();
         // define what I want the key to end up looking like
-        PBEKeySpec spec = new PBEKeySpec(passwordAsCharArray, salt, 
+        PBEKeySpec pbeKeySpec = new PBEKeySpec(passwordAsCharArray, salt, 
                 iterationCount, (hashLength * 8 /* bits per byte */));
         // create the object that will make the key
-        SecretKeyFactory skf = SecretKeyFactory.getInstance(SECRET_KEY_FACTORY_ALGORITHM);
-        // generate the key and retrieve the encoded key
-        SecretKey secretKey = skf.generateSecret(spec);
+        SecretKeyFactory secretKeyFactory = SecretKeyFactory.getInstance(SECRET_KEY_FACTORY_ALGORITHM);
+        // generate the key
+        SecretKey secretKey = secretKeyFactory.generateSecret(pbeKeySpec);
 
         // System.out.println(new String(secretKey.getEncoded()));
         System.out.println(secretKey.getFormat());

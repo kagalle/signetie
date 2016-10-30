@@ -54,10 +54,11 @@ public class Signetie {
     // http://www.javamex.com/tutorials/cryptography/rsa_key_length.shtml
     // http://www.javamex.com/tutorials/cryptography/rsa_encryption.shtml
     private static void createPkcs8() throws NoSuchAlgorithmException, IOException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, InvalidKeySpecException, InvalidKeyException, InvalidAlgorithmParameterException, InvalidParameterSpecException, SignetieException {
-        // generate key pair
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-        keyPairGenerator.initialize(4096);
-        KeyPair keyPair = keyPairGenerator.genKeyPair();
+      // generate key pair
+        KeyPair keyPair = Signetie.generateKeyPair();
+//        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+//        keyPairGenerator.initialize(4096);
+//        KeyPair keyPair = keyPairGenerator.genKeyPair();
 
         // extract the encoded private key, this is an unencrypted PKCS#8 private key
 //        byte[] encodedprivkey = keyPair.getPrivate().getEncoded();
@@ -73,22 +74,25 @@ public class Signetie {
 
         // Create key from the password needed to encrypt the private key
         Pbkdf2PasswordHasher instance = new Pbkdf2PasswordHasher();
-        SecretKey pbeKey = instance.generateHash(password).getKey();
-
+        PasswordHash passwordHash = instance.generateHash(password);
+        SecretKey pbeKey = passwordHash.getKey();
+                
         // encrypt the private key
-        Cipher c = Cipher.getInstance("RSA");
+        Cipher c = Cipher.getInstance("AES"); // was RSA, but that doesn't make sense - why use an asymetric key here?
         c.init(Cipher.WRAP_MODE, pbeKey);
         byte[] encryptedPrivateKey = c.wrap(keyPair.getPrivate());
         
-        
+        // attempt to extract the key
         
         
         
 
         // Now construct  PKCS #8 EncryptedPrivateKeyInfo object
-//        AlgorithmParameters algparms = AlgorithmParameters.getInstance(MYPBEALG);
-//        algparms.init(pbeParamSpec);
-//        EncryptedPrivateKeyInfo encinfo = new EncryptedPrivateKeyInfo(algparms, ciphertext);
+        AlgorithmParameters algparms = 
+                AlgorithmParameters.getInstance(passwordHash.getSecretKeyFactoryAlgorithm());
+        
+        algparms.init(pbeParamSpec);
+        EncryptedPrivateKeyInfo encinfo = new EncryptedPrivateKeyInfo(algparms, ciphertext);
 
         // and here we have it! a DER encoded PKCS#8 encrypted key!
 //        byte[] encryptedPkcs8 = encinfo.getEncoded();
@@ -107,10 +111,13 @@ public class Signetie {
     }
  
     // http://stackoverflow.com/a/3985508/3728147
-    private void x() throws SignetieException, IOException {
+    private void readOutPkcs8EncryptedKey() throws SignetieException, IOException {
       KeyPair keyPair = Signetie.generateKeyPair();
       PrivateKey privateKey = keyPair.getPrivate();
-EncryptedPrivateKeyInfo encryptPKInfo = new EncryptedPrivateKeyInfo(privateKey.getEncoded());
+      
+      
+      
+EncryptedPrivateKeyInfo encryptPKInfo = new EncryptedPrivateKeyInfo(algParams, encryptedData);
 
 Cipher cipher = Cipher.getInstance(encryptPKInfo.getAlgName());
 PBEKeySpec pbeKeySpec = new PBEKeySpec(passwd.toCharArray());
