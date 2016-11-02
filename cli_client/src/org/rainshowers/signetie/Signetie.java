@@ -78,32 +78,17 @@ public class Signetie {
 
         // Encrypt something with the public key.
         String message = "An important message to be sent PKI.";
-        Cipher rsaEncryptCipher;
-        byte[] encryptedMessage = {0x00};
-        try {
-            rsaEncryptCipher = Cipher.getInstance("RSA"); // max 501 bytes can be encrypted
-            rsaEncryptCipher.init(Cipher.ENCRYPT_MODE, keyPair.getPublic());
-            encryptedMessage = rsaEncryptCipher.doFinal(message.getBytes());
-        } catch (NoSuchAlgorithmException ex) {
-            Logger.getLogger(Signetie.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        byte[] encryptedMessage = RsaPkiEncryption.encryptWithPublicKey(keyPair, message);
 
         // Decrypt and verify
-        Cipher rsaDecryptCipher;
-        try {
-            rsaDecryptCipher = Cipher.getInstance("RSA");
-            rsaDecryptCipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
-            String firstDecryptedMessage = new String(rsaDecryptCipher.doFinal(encryptedMessage));
-            if (message.equals(firstDecryptedMessage)) {
-                System.out.println("yes");
-            }
-        } catch (NoSuchAlgorithmException ex) {
-            Logger.getLogger(Signetie.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        String firstDecryptedMessage = RsaPkiEncryption.decryptWithPrivateKey(keyPair, encryptedMessage);
+        System.out.println( (message.equals(firstDecryptedMessage) ? "yes" : "no") );
 
         // Encrypt the private key
+        
         String password = "super_secret";
-
+        byte[] encryptedPrivateKey = AsymmetricEncryption.encryptPrivateKey(keyPair);
+        
         // Create key from the password needed to encrypt the private key
         Pbkdf2PasswordHasher instance = new Pbkdf2PasswordHasher();
         PasswordHash passwordHash = instance.generateHash(password);
@@ -139,14 +124,12 @@ public class Signetie {
             aesPbeDecryptCipher.init(Cipher.DECRYPT_MODE, aesKeySpec, iv);
             byte[] decryptedPrivateKeyData = aesPbeDecryptCipher.doFinal(encryptedPrivateKey);
 //            decryptedPrivateKey = new PrivateKey(decryptedPrivateKeyData, "RSA");
-  
+
             // http://stackoverflow.com/a/8455164/3728147
-  KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-  KeySpec privateKeySpec = new PKCS8EncodedKeySpec(decryptedPrivateKeyData);
-  decryptedPrivateKey = keyFactory.generatePrivate(privateKeySpec);            
-            
-            
-            
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            KeySpec privateKeySpec = new PKCS8EncodedKeySpec(decryptedPrivateKeyData);
+            decryptedPrivateKey = keyFactory.generatePrivate(privateKeySpec);
+
         } catch (NoSuchAlgorithmException ex) {
             Logger.getLogger(Signetie.class.getName()).log(Level.SEVERE, null, ex);
         }

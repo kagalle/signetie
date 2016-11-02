@@ -23,6 +23,7 @@ import javax.crypto.spec.PBEKeySpec;
  * @author Ken Galle <ken@rainshowers.org>
  */
 public class Pbkdf2PasswordHasher implements PasswordHasher {
+    private static final String SECRET_KEY_FACTORY_ALGORITHM = "PBKDF2WithHmacSHA1";
     //timing: http://stackoverflow.com/a/180191/3728147
     private int iterationCount = 100000;
     private int hashLength = 32;
@@ -93,7 +94,6 @@ public class Pbkdf2PasswordHasher implements PasswordHasher {
         }
     }
 
-    private static final String SECRET_KEY_FACTORY_ALGORITHM = "PBKDF2WithHmacSHA1";
     /**
      * The JCA/JCE internals of actually creating the hash.
      * @param password The password as a String.
