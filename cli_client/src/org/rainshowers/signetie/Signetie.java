@@ -85,55 +85,13 @@ public class Signetie {
         System.out.println( (message.equals(firstDecryptedMessage) ? "yes" : "no") );
 
         // Encrypt the private key
-        
         String password = "super_secret";
-        byte[] encryptedPrivateKey = AsymmetricEncryption.encryptPrivateKey(keyPair);
-        
-        // Create key from the password needed to encrypt the private key
-        Pbkdf2PasswordHasher instance = new Pbkdf2PasswordHasher();
-        PasswordHash passwordHash = instance.generateHash(password);
-        SecretKey pbeKey = passwordHash.getKey();
-
-        // encrypt the private key
-//        Cipher aesPbeEncryptCipher = Cipher.getInstance("AES"); // was RSA, but that doesn't make sense - why use an asymetric key here?
-        //     create a key in the specific form needed for AES, based on the key value in the pbeKey
-        //     http://stackoverflow.com/a/13770749/3728147
-        SecretKeySpec aesKeySpec = new SecretKeySpec(pbeKey.getEncoded(), "AES");
-
-        Cipher aesPbeEncryptCipher;
-        byte[] encryptedPrivateKey = {0x00};
-        IvParameterSpec iv = null;
-        try {
-            aesPbeEncryptCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            byte[] ivBytes = new byte[aesPbeEncryptCipher.getBlockSize()];
-            iv = new IvParameterSpec(ivBytes);
-//        aesPbeEncryptCipher.init(Cipher.ENCRYPT_MODE, pbeKey, iv);        
-            aesPbeEncryptCipher.init(Cipher.ENCRYPT_MODE, aesKeySpec, iv);  // pbeKey has to match DESede - somehow
-            encryptedPrivateKey = aesPbeEncryptCipher.doFinal(keyPair.getPrivate().getEncoded());
-        } catch (NoSuchAlgorithmException ex) {
-            Logger.getLogger(Signetie.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        // changing the IV size will result in an exception
+        byte[] encryptedPrivateKey = SymmetricEncryption.encryptPrivateKey(keyPair, password);
 
         // Extract the private key
-        Cipher aesPbeDecryptCipher;
-        Key decryptedPrivateKey = null;
-        try {
-            aesPbeDecryptCipher = Cipher.getInstance("AES/CBC/PKCS5Padding"); // was RSA, but that doesn't make sense - why use an asymetric key here?
-            // https://community.oracle.com/thread/1528052?start=0
-            aesPbeDecryptCipher.init(Cipher.DECRYPT_MODE, aesKeySpec, iv);
-            byte[] decryptedPrivateKeyData = aesPbeDecryptCipher.doFinal(encryptedPrivateKey);
-//            decryptedPrivateKey = new PrivateKey(decryptedPrivateKeyData, "RSA");
-
-            // http://stackoverflow.com/a/8455164/3728147
-            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-            KeySpec privateKeySpec = new PKCS8EncodedKeySpec(decryptedPrivateKeyData);
-            decryptedPrivateKey = keyFactory.generatePrivate(privateKeySpec);
-
-        } catch (NoSuchAlgorithmException ex) {
-            Logger.getLogger(Signetie.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
+        Key decryptedPrivateKey = SymmetricEncryption.decryptPrivateKey(keyPair, password);
+        
+        
         // Decrypt message again with en/decrypted version key and verify
         Cipher rsaDecryptCipher2;
         try {
