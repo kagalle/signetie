@@ -3,14 +3,14 @@
  * Use of this software is governed by a GPL v2 license
  * that can be found in the LICENSE file.
  */
-package org.rainshowers.signetie;
+package org.rainshowers.signetie.pbe;
 
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
+import org.rainshowers.signetie.SignetieException;
 
 
 
@@ -33,25 +33,17 @@ public class Pbkdf2PasswordHasher implements PasswordHasher {
     }
     
     // https://en.wikipedia.org/wiki/PBKDF2
-    private static final String RANDOM_ALGORITHM = "SHA1PRNG";
-    private static final String GENERATE_SALT_ERROR = 
-            "Error creating random salt for password hash.";
     /**
      * Generate a hash value based on the password supplied and a random
      * salt value.
      */
     @Override
     public PasswordHash generateHash(String password) throws SignetieException {
-        try {
-            // Generate a new salt value;
-            byte[] salt = new byte[32];
-            SecureRandom sr = SecureRandom.getInstance(RANDOM_ALGORITHM);
-            sr.nextBytes(salt);
-            PasswordHash passwordHash = generateHash(password, salt);
-            return passwordHash;
-        } catch (NoSuchAlgorithmException ex) {
-            throw new SignetieException(GENERATE_SALT_ERROR, ex);
-        }
+        // create default hash parameters to use
+        PasswordHashParams passwordHashParams = new PasswordHashParams();
+        // create the hash
+        PasswordHash passwordHash = generateHash(password, passwordHashParams);
+        return passwordHash;
     }
 
     private static final String GENERATE_HASH_ERROR = "Error generating password hash.";
@@ -59,16 +51,22 @@ public class Pbkdf2PasswordHasher implements PasswordHasher {
      * Generate a hash value based on the password and salt values supplied.
      */
     @Override
-    public PasswordHash generateHash(String password, byte[] salt) throws SignetieException {
+    public PasswordHash generateHash(String password, PasswordHashParams passwordHashParams) 
+            throws SignetieException {
+        
         long startTime = System.nanoTime();
         try {
-            SecretKey secretKey = generateKey(password, salt, iterationCount, hashLength);
+            SecretKey secretKey = generateKey(password, 
+                    passwordHashParams.getSalt(), 
+                    passwordHashParams.getInterationCount(), 
+                    passwordHashParams.getHashLength());
+            
             // track the time it took to compute
             long endTime = System.nanoTime();
             // divide by 1e6 to convert from nanoseconds to milliseconds.
             duration = (endTime - startTime) / 1000000;
             // bundle up the result to return
-            PasswordHash passwordHash = new PasswordHash(secretKey, salt, iterationCount, SECRET_KEY_FACTORY_ALGORITHM);
+            PasswordHash passwordHash = new PasswordHash(secretKey, passwordHashParams);
             return passwordHash;
         } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
             throw new SignetieException(GENERATE_HASH_ERROR, ex);
@@ -82,8 +80,8 @@ public class Pbkdf2PasswordHasher implements PasswordHasher {
             throws SignetieException {
         try {
             // generate a hash based on the supplied password
-            SecretKey secretKey = generateKey(password, passwordHash.getSalt(),
-                    passwordHash.getInterationCount(), passwordHash.getHashLength());
+            SecretKey secretKey = generateKey(password, passwordHash.getPasswordHashParams().getSalt(),
+                    passwordHash.getPasswordHashParams().getInterationCount(), passwordHash.getHashLength());
             // convert both old and new hashes to strings
             String oldHashString = PasswordHash.byteArrayToString(passwordHash.getKey().getEncoded());
             String newHashString = PasswordHash.byteArrayToString(secretKey.getEncoded());

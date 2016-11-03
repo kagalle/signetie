@@ -5,34 +5,26 @@
  */
 package org.rainshowers.signetie;
 
+import org.rainshowers.signetie.asymmetric.RsaPkiEncryption;
+import org.rainshowers.signetie.symmetric.SymmetricEncryption;
 import java.io.IOException;
-import java.security.AlgorithmParameters;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
-import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.InvalidParameterSpecException;
-import java.security.spec.KeySpec;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
-import javax.crypto.EncryptedPrivateKeyInfo;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.PBEParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
+import org.rainshowers.signetie.pbe.PasswordHash;
+import org.rainshowers.signetie.pbe.Pbkdf2PasswordHasher;
+import org.rainshowers.signetie.symmetric.SymmetricResult;
 
 /**
  *
@@ -84,15 +76,21 @@ public class Signetie {
         String firstDecryptedMessage = RsaPkiEncryption.decryptWithPrivateKey(keyPair, encryptedMessage);
         System.out.println( (message.equals(firstDecryptedMessage) ? "yes" : "no") );
 
-        // Encrypt the private key
+        // generate hash from password
         String password = "super_secret";
-        byte[] encryptedPrivateKey = SymmetricEncryption.encryptPrivateKey(keyPair, password);
+        Pbkdf2PasswordHasher instance = new Pbkdf2PasswordHasher();
+        PasswordHash passwordHash = instance.generateHash(password);
+        
+        // Encrypt the private key
+        SymmetricResult symmetricResult = SymmetricEncryption.encryptPrivateKey(keyPair, passwordHash.getKey());
 
         // Extract the private key
-        Key decryptedPrivateKey = SymmetricEncryption.decryptPrivateKey(keyPair, password);
+        Key decryptedPrivateKey = SymmetricEncryption.decryptPrivateKey(keyPair, symmetricResult, passwordHash.getKey());
         
         
         // Decrypt message again with en/decrypted version key and verify
+//        RsaPkiEncryption.decryptWithPrivateKey(keyPair, encryptedMessage);
+        
         Cipher rsaDecryptCipher2;
         try {
             rsaDecryptCipher2 = Cipher.getInstance("RSA");

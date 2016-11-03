@@ -1,9 +1,9 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright 2016 Kenneth Galle.  All rights reserved.
+ * Use of this software is governed by a GPL v2 license
+ * that can be found in the LICENSE file.
  */
-package org.rainshowers.signetie;
+package org.rainshowers.signetie.asymmetric;
 
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
@@ -14,6 +14,7 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import org.rainshowers.signetie.SignetieException;
 
 /**
  *
@@ -43,7 +44,7 @@ public class RsaPkiEncryption {
         return encryptedMessage;
     }
 
-    static String decryptWithPrivateKey(KeyPair keyPair, byte[] encryptedMessage) {
+    public static String decryptWithPrivateKey(KeyPair keyPair, byte[] encryptedMessage) {
         String decryptedMessage = null;
         try {
             Cipher rsaDecryptCipher;

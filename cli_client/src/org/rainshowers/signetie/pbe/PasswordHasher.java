@@ -3,7 +3,9 @@
  * Use of this software is governed by a GPL v2 license
  * that can be found in the LICENSE file.
  */
-package org.rainshowers.signetie;
+package org.rainshowers.signetie.pbe;
+
+import org.rainshowers.signetie.SignetieException;
 
 /**
  * Use some hashing method to generate a hash value of the specified length.
@@ -24,7 +26,7 @@ public interface PasswordHasher {
     /**
      * Generate a hash value based on the password and salt values supplied.
      */
-    PasswordHash generateHash(String password, byte[] salt) throws SignetieException;
+    PasswordHash generateHash(String password, PasswordHashParams passwordHashParams) throws SignetieException;
 
     /**
      * Retrieve the approximate time it took to generate the key.  The iteration

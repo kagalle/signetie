@@ -5,11 +5,14 @@
  */
 package org.rainshowers.signetie;
 
+import org.rainshowers.signetie.pbe.PasswordHash;
+import org.rainshowers.signetie.pbe.Pbkdf2PasswordHasher;
 import org.hamcrest.core.IsEqual;
 import org.hamcrest.core.IsNot;
 import org.junit.Assert;
 import org.junit.Test;
 import static org.junit.Assert.*;
+import org.rainshowers.signetie.pbe.PasswordHashParams;
 
 /**
  *
@@ -55,7 +58,8 @@ public class Pbkdf2PasswordHashTest {
         String password = "Super big secret";
         Pbkdf2PasswordHasher instance = new Pbkdf2PasswordHasher();
         // Have to push the salt value in to get repeatable results
-        PasswordHash result = instance.generateHash(password, VALID_TEST_SALT);
+        PasswordHashParams passwordHashParams = new PasswordHashParams(VALID_TEST_SALT);
+        PasswordHash result = instance.generateHash(password, passwordHashParams);
         /*
          * Here I specify the salt value, so I can determine ahead what the 
          * resulting hash should be.
@@ -72,7 +76,8 @@ public class Pbkdf2PasswordHashTest {
         String password = "Super big secret";
 
         Pbkdf2PasswordHasher instance = new Pbkdf2PasswordHasher();
-        PasswordHash passwordHash = instance.generateHash(password, VALID_TEST_SALT);
+        PasswordHashParams passwordHashParams = new PasswordHashParams(VALID_TEST_SALT);
+        PasswordHash passwordHash = instance.generateHash(password, passwordHashParams);
 
         boolean expResult = true;
         boolean result = Pbkdf2PasswordHasher.verifyHash(password, passwordHash);
