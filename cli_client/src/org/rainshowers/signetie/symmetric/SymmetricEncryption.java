@@ -9,7 +9,6 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyFactory;
-import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
@@ -33,12 +32,18 @@ public class SymmetricEncryption {
 
     private static final String ENCRYPT_PRIVATE_KEY_ERROR = "Error encrypting private key.";
     /**
-     * Encrypt the private key in the supplied keyPair and return the encrypted private key.
+     * Encrypt the supplied public/private key and return the encrypted key.
+     * This has to return the initialization vector (salt) as well as the encrypted key, 
+     * so that the IV can be supplied later on when decrypting
+     * 
+     * @param key The public or private key to be encrypted.
+     * @param pbeKey The SecretKey (password-based key) used to create an AES key used to sign 
+     * the public/private key.
+     * @return The result of the encryption: the encrypted key and the initialization vector
+     * which is needed in order to later decrypt they key.
+     * @throws SignetieException 
      */
-    // TODO: this has to return the salt as well (in a object that hopefully already exists
-    // in the crypto library, so that the salt can be supplied later on when decrypting
-    // the private key.
-    public static SymmetricResult encryptPrivateKey(KeyPair keyPair, SecretKey pbeKey) throws SignetieException {
+    public static SymmetricResult encryptKey(Key key, SecretKey pbeKey) throws SignetieException {
         
         // encrypt the private key
         //     create a key in the specific form needed for AES, based on the key value in the pbeKey
@@ -53,7 +58,7 @@ public class SymmetricEncryption {
             byte[] ivBytes = new byte[aesPbeEncryptCipher.getBlockSize()];
             initializationVector = new IvParameterSpec(ivBytes);
             aesPbeEncryptCipher.init(Cipher.ENCRYPT_MODE, aesKeySpec, initializationVector);  // pbeKey has to match DESede - somehow
-            encryptedPrivateKey = aesPbeEncryptCipher.doFinal(keyPair.getPrivate().getEncoded());
+            encryptedPrivateKey = aesPbeEncryptCipher.doFinal(key.getEncoded());
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | 
                 InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException ex) {
             throw new SignetieException(ENCRYPT_PRIVATE_KEY_ERROR, ex);
@@ -63,17 +68,26 @@ public class SymmetricEncryption {
     }
 
     private static final String DECRYPT_PRIVATE_KEY_ERROR = "Error decrypting private key.";
-    
-    public static Key decryptPrivateKey(KeyPair keyPair, SymmetricResult symmetricResult, SecretKey pbeKey) throws SignetieException {
+    /**
+     * Decrypt the supplied encrypted key by using the supplied Secret key and the 
+     * initialization vector stored along with the encrypted key in symmetricResult.
+     * 
+     * @param symmetricResult The encrypted key and the initialzation vector used when it was
+     * encrypted.
+     * @param pbeKey The password-based key that was used to encrypt the key originally.  This
+     * is the output of the PasswordHasher and the (textural) password.
+     * @return The decrypted key.
+     * @throws SignetieException 
+     */
+    public static Key decryptKey(SymmetricResult symmetricResult, SecretKey pbeKey) throws SignetieException {
         Cipher aesPbeDecryptCipher;
         Key decryptedPrivateKey = null;
         try {
             SecretKeySpec aesKeySpec = new SecretKeySpec(pbeKey.getEncoded(), "AES");
-            aesPbeDecryptCipher = Cipher.getInstance("AES/CBC/PKCS5Padding"); // was RSA, but that doesn't make sense - why use an asymetric key here?
+            aesPbeDecryptCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             // https://community.oracle.com/thread/1528052?start=0
             aesPbeDecryptCipher.init(Cipher.DECRYPT_MODE, aesKeySpec, symmetricResult.getInitializationVector());
-            byte[] decryptedPrivateKeyData = aesPbeDecryptCipher.doFinal(symmetricResult.getEncryptedPrivateKey());
-//            decryptedPrivateKey = new PrivateKey(decryptedPrivateKeyData, "RSA");
+            byte[] decryptedPrivateKeyData = aesPbeDecryptCipher.doFinal(symmetricResult.getEncryptedKey());
 
             // http://stackoverflow.com/a/8455164/3728147
             KeyFactory keyFactory = KeyFactory.getInstance("RSA");

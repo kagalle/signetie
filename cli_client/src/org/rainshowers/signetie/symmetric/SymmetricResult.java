@@ -12,23 +12,23 @@ import javax.crypto.spec.IvParameterSpec;
  * @author Ken Galle <ken@rainshowers.org>
  */
 public class SymmetricResult {
-    private  byte[] encryptedPrivateKey;
+    private  byte[] encryptedKey;
     private IvParameterSpec initializationVector;
 
     public SymmetricResult() {
     }
 
-    public SymmetricResult(byte[] encryptedPrivateKey, IvParameterSpec initializationVector) {
-        this.encryptedPrivateKey = encryptedPrivateKey;
+    public SymmetricResult(byte[] encryptedKey, IvParameterSpec initializationVector) {
+        this.encryptedKey = encryptedKey;
         this.initializationVector = initializationVector;
     }
 
-    public byte[] getEncryptedPrivateKey() {
-        return encryptedPrivateKey;
+    public byte[] getEncryptedKey() {
+        return encryptedKey;
     }
 
-    public void setEncryptedPrivateKey(byte[] encryptedPrivateKey) {
-        this.encryptedPrivateKey = encryptedPrivateKey;
+    public void setEncryptedKey(byte[] encryptedKey) {
+        this.encryptedKey = encryptedKey;
     }
 
     public IvParameterSpec getInitializationVector() {

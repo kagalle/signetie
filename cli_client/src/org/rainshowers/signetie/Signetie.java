@@ -7,21 +7,10 @@ package org.rainshowers.signetie;
 
 import org.rainshowers.signetie.asymmetric.RsaPkiEncryption;
 import org.rainshowers.signetie.symmetric.SymmetricEncryption;
-import java.io.IOException;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.InvalidParameterSpecException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import org.rainshowers.signetie.pbe.PasswordHash;
 import org.rainshowers.signetie.pbe.Pbkdf2PasswordHasher;
 import org.rainshowers.signetie.symmetric.SymmetricResult;
@@ -32,25 +21,14 @@ import org.rainshowers.signetie.symmetric.SymmetricResult;
  */
 public class Signetie {
 
-    private class SignetieKeyPair {
-
-        private Key privateKey;
-        public Key publicKey;
-
-    }
-
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) throws SignetieException {
-//      KeyPair keyPair = generateKeyPair();
 
         try {
             Signetie.createPkcs8();
-        } catch (IOException | IllegalBlockSizeException |
-                BadPaddingException | NoSuchPaddingException | InvalidKeySpecException |
-                InvalidKeyException | InvalidAlgorithmParameterException |
-                InvalidParameterSpecException ex) {
+        } catch (SignetieException ex) {
             Logger.getLogger(Signetie.class.getName()).log(Level.SEVERE, null, ex);
         }
 
@@ -64,16 +42,16 @@ public class Signetie {
     // http://anandsekar.github.io/exporting-the-private-key-from-a-jks-keystore/
     // http://www.javamex.com/tutorials/cryptography/rsa_key_length.shtml
     // http://www.javamex.com/tutorials/cryptography/rsa_encryption.shtml
-    private static void createPkcs8() throws IOException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, InvalidKeySpecException, InvalidKeyException, InvalidAlgorithmParameterException, InvalidParameterSpecException, SignetieException {
+    private static void createPkcs8() throws SignetieException {
         // generate key pair
-        KeyPair keyPair = Signetie.generateKeyPair();
+        KeyPair keyPair = RsaPkiEncryption.generateKeyPair();
 
         // Encrypt something with the public key.
         String message = "An important message to be sent PKI.";
-        byte[] encryptedMessage = RsaPkiEncryption.encryptWithPublicKey(keyPair, message);
+        byte[] encryptedMessage = RsaPkiEncryption.encryptWithPkiKey(keyPair.getPublic(), message);
 
-        // Decrypt and verify
-        String firstDecryptedMessage = RsaPkiEncryption.decryptWithPrivateKey(keyPair, encryptedMessage);
+        // Decrypt with the matching private key and verify
+        String firstDecryptedMessage = RsaPkiEncryption.decryptWithPkiKey(keyPair.getPrivate(), encryptedMessage);
         System.out.println( (message.equals(firstDecryptedMessage) ? "yes" : "no") );
 
         // generate hash from password
@@ -82,40 +60,15 @@ public class Signetie {
         PasswordHash passwordHash = instance.generateHash(password);
         
         // Encrypt the private key
-        SymmetricResult symmetricResult = SymmetricEncryption.encryptPrivateKey(keyPair, passwordHash.getKey());
+        SymmetricResult symmetricResult = SymmetricEncryption.encryptKey(keyPair.getPrivate(), passwordHash.getKey());
 
         // Extract the private key
-        Key decryptedPrivateKey = SymmetricEncryption.decryptPrivateKey(keyPair, symmetricResult, passwordHash.getKey());
-        
+        Key decryptedPrivateKey = SymmetricEncryption.decryptKey(symmetricResult, passwordHash.getKey());
         
         // Decrypt message again with en/decrypted version key and verify
-//        RsaPkiEncryption.decryptWithPrivateKey(keyPair, encryptedMessage);
+        String secondDecryptedMessage = RsaPkiEncryption.decryptWithPkiKey(decryptedPrivateKey, encryptedMessage);
+        System.out.println( (message.equals(secondDecryptedMessage) ? "yes" : "no") );
         
-        Cipher rsaDecryptCipher2;
-        try {
-            rsaDecryptCipher2 = Cipher.getInstance("RSA");
-            rsaDecryptCipher2.init(Cipher.DECRYPT_MODE, decryptedPrivateKey);
-            String secondDecryptedMessage = new String(rsaDecryptCipher2.doFinal(encryptedMessage));
-            if (message.equals(secondDecryptedMessage)) {
-                System.out.println("yes");
-            }
-        } catch (NoSuchAlgorithmException ex) {
-            Logger.getLogger(Signetie.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-    }
-    private static final String GENERATE_KEYPAIR_ERROR = "Error generating key pair.";
-
-    public static KeyPair generateKeyPair() throws SignetieException {
-        try {
-            // generate key pair
-            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-            keyPairGenerator.initialize(4096);
-            KeyPair keyPair = keyPairGenerator.genKeyPair();
-            return keyPair;
-        } catch (NoSuchAlgorithmException ex) {
-            throw new SignetieException(GENERATE_KEYPAIR_ERROR, ex);
-        }
     }
 
     // http://stackoverflow.com/a/3985508/3728147
