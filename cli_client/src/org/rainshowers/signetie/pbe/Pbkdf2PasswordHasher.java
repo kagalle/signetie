@@ -114,10 +114,6 @@ public class Pbkdf2PasswordHasher implements PasswordHasher {
         SecretKeyFactory secretKeyFactory = SecretKeyFactory.getInstance(SECRET_KEY_FACTORY_ALGORITHM);
         // generate the key
         SecretKey secretKey = secretKeyFactory.generateSecret(pbeKeySpec);
-
-        // System.out.println(new String(secretKey.getEncoded()));
-        System.out.println(secretKey.getFormat());
-        System.out.println(secretKey.getAlgorithm());
         return secretKey;
     }
     

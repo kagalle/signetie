@@ -10,7 +10,6 @@ import java.security.Key;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.crypto.BadPaddingException;
@@ -18,6 +17,16 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import org.rainshowers.signetie.SignetieException;
+
+// based on http://stackoverflow.com/a/6164414/3728147
+// http://stackoverflow.com/a/16586921/3728147
+// http://www.programcreek.com/java-api-examples/index.php?api=java.security.spec.PKCS8EncodedKeySpec
+// http://snipplr.com/view/18368/
+// http://stackoverflow.com/questions/19640735/load-public-key-data-from-file
+// http://anandsekar.github.io/exporting-the-private-key-from-a-jks-keystore/
+// http://www.javamex.com/tutorials/cryptography/rsa_key_length.shtml
+// http://www.javamex.com/tutorials/cryptography/rsa_encryption.shtml
+// http://stackoverflow.com/a/3985508/3728147
 
 /**
  *
