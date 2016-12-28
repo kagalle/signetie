@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"runtime"
 
-	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/kagalle/signetie/client_golang/gae"
 )
@@ -12,6 +12,7 @@ import (
 func main() {
 	fmt.Printf("A1")
 	// Initialize GTK without parsing any command line arguments.
+	runtime.LockOSThread()
 	gtk.Init(nil)
 	fmt.Printf("A2")
 	win, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
@@ -50,11 +51,14 @@ func main() {
 	if err != nil {
 		log.Fatal("Unable to create run button:", err)
 	}
+	auth.Setup()
 	runButton.Connect("clicked", func() {
 		fmt.Printf("M1")
-		glib.IdleAdd(auth.Run,
-			"https://www.googleapis.com/auth/userinfo.profile",
+		auth.Run("https://www.googleapis.com/auth/userinfo.profile",
 			"192820621204-nrkum19gt8a7hjrrkrdpdhh2qgmi0toq.apps.googleusercontent.com")
+		// glib.IdleAdd(auth.Run,
+		// 	"https://www.googleapis.com/auth/userinfo.profile",
+		// 	"192820621204-nrkum19gt8a7hjrrkrdpdhh2qgmi0toq.apps.googleusercontent.com")
 		fmt.Printf("M2")
 	})
 	vbox.Add(runButton)

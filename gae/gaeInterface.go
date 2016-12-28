@@ -6,12 +6,18 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/sourcegraph/go-webkit2/webkit2"
+	"github.com/sqs/gojs"
 )
+
+// "github.com/sqs/gojs"
 
 type Authenticate struct {
 	*gtk.Window // default member
+	webView     *webkit2.WebView
+	authWindow  *gtk.Window
 	callback    AuthenticateComplete
 	found       bool
 	code        string
@@ -47,18 +53,19 @@ func (auth *Authenticate) GetCancelled() bool {
 
 //	"cmd/internal/pprof/tempfile"
 
-// Authenicate returns the code if successful, or non-nil error if not (code, err).
-func (auth *Authenticate) Run(scope string, clientID string) (string, error) {
+func (auth *Authenticate) Setup() {
 	// create window for browser
-	win, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
+	var err error
+	auth.authWindow, err = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
 	if err != nil {
 		log.Fatal("Unable to create authenticate window:", err)
 	}
-	win.SetTitle("Authenticate")
-	win.SetModal(true)
-	win.SetTransientFor(auth.Window)
-	win.SetDestroyWithParent(true)
-	win.Connect("destroy", func() bool {
+	auth.authWindow.SetDefaultSize(850, 600)
+	auth.authWindow.SetTitle("Authenticate")
+	auth.authWindow.SetModal(true)
+	auth.authWindow.SetTransientFor(auth.Window)
+	auth.authWindow.SetDestroyWithParent(true)
+	auth.authWindow.Connect("destroy", func() bool {
 		if (!auth.found) && (!auth.cancelled) {
 			auth.cancelled = true
 		}
@@ -67,26 +74,53 @@ func (auth *Authenticate) Run(scope string, clientID string) (string, error) {
 		return false // let the window close
 	})
 
-	vbox, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 6)
-	if err != nil {
-		log.Fatal("Unable to create vertical box:", err)
-	}
-	win.Add(vbox)
+	// vbox, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 6)
+	// if err != nil {
+	// 	log.Fatal("Unable to create vertical box:", err)
+	// }
 
-	webView := webkit2.NewWebView()
-	vbox.Add(webView)
-
+	auth.webView = webkit2.NewWebView()
+	auth.webView.SetVisible(true)
+	// webView.Show()
+	auth.webView.Connect("load-failed", func() {
+		fmt.Println("Load failed.")
+	})
+	auth.webView.Connect("load-changed", func(_ *glib.Object, i int) {
+		loadEvent := webkit2.LoadEvent(i)
+		switch loadEvent {
+		case webkit2.LoadFinished:
+			fmt.Println("Load finished.")
+			fmt.Printf("Title: %q\n", auth.webView.Title())
+			fmt.Printf("URI: %s\n", auth.webView.URI())
+			auth.webView.RunJavaScript("window.location.hostname", func(val *gojs.Value, err error) {
+				if err != nil {
+					fmt.Println("JavaScript error.")
+				} else {
+					fmt.Printf("Hostname (from JavaScript): %q\n", val)
+				}
+				// gtk.MainQuit()
+			})
+		}
+	})
 	cancelButton, err := gtk.ButtonNewWithLabel("Cancel")
 	if err != nil {
 		log.Fatal("Unable to create cancel button:", err)
 	}
 	cancelButton.Connect("clicked", func() {
 		auth.cancelled = true
-		auth.found = false // insure consistency
-		win.Destroy()      // which will trigger win destroy event
+		auth.found = false        // insure consistency
+		auth.authWindow.Destroy() // which will trigger win destroy event
 	})
-	vbox.Add(cancelButton)
-	win.ShowAll()
+	// cancelButton.Show()
+	// vbox.Add(auth.webView)
+	// auth.authWindow.Add(vbox)
+	auth.authWindow.Add(auth.webView)
+
+	// vbox.Add(cancelButton)
+}
+
+// Authenicate returns the code if successful, or non-nil error if not (code, err).
+func (auth *Authenticate) Run(scope string, clientID string) {
 
 	// form string
 	var code string
@@ -101,10 +135,12 @@ func (auth *Authenticate) Run(scope string, clientID string) (string, error) {
 	// start the server to listen for the results
 	// http://stackoverflow.com/a/6329459
 	fmt.Printf("B2")
-	c := make(chan bool)
+	c1 := make(chan bool)
 	go func() {
+		fmt.Printf("B3")
 		http.HandleFunc("/",
 			func(w http.ResponseWriter, r *http.Request) {
+				fmt.Printf("B4")
 				fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
 				// http://stackoverflow.com/a/25606975
 				tempcode := r.URL.Query().Get("code")
@@ -112,20 +148,34 @@ func (auth *Authenticate) Run(scope string, clientID string) (string, error) {
 					code = tempcode
 				}
 				// io.WriteString(w, "Hello world!")
+				fmt.Printf("B5")
 			})
-		log.Fatal(http.ListenAndServe(":8146", nil)) // TODO make the port a parameter
-		c <- true
+		fmt.Printf("B6")
+		http.ListenAndServe(":8146", nil) // TODO make the port a parameter
+		fmt.Printf("B7")
+		c1 <- true
+		// return false // ask IdleAdd() to not call this anonymous function again
 	}()
-	fmt.Printf("C")
+	fmt.Printf("C1")
 
 	// do some other stuff here while the blocking function runs
 	// make the call
-	webView.LoadURI(authURL)
+	// c2 := make(chan bool)
+	// go func() {
+	auth.authWindow.ShowAll()
+	glib.IdleAdd(func() bool {
+		fmt.Printf("C2")
+		auth.webView.LoadURI(authURL) // blocks until it loads - requires UI
+		fmt.Printf("C3")
+		// c2 <- true
+		return false
+	})
+	// }()
 	fmt.Printf("D")
 
 	// wait for the blocking function to finish if it hasn't already
-	<-c
+	// <-c
 	fmt.Printf("E")
 
-	return code, err
+	// return code, err
 }
