@@ -54,6 +54,11 @@ func (auth *Authenticate) GetCancelled() bool {
 //	"cmd/internal/pprof/tempfile"
 
 func (auth *Authenticate) Setup() {
+
+}
+
+// Authenicate returns the code if successful, or non-nil error if not (code, err).
+func (auth *Authenticate) Run(scope string, clientID string) {
 	// create window for browser
 	var err error
 	auth.authWindow, err = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
@@ -74,14 +79,26 @@ func (auth *Authenticate) Setup() {
 		return false // let the window close
 	})
 
-	// vbox, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 6)
-	// if err != nil {
-	// 	log.Fatal("Unable to create vertical box:", err)
-	// }
+	vbox, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 6)
+	if err != nil {
+		log.Fatal("Unable to create vertical box:", err)
+	}
+	vbox.Show()
 
 	auth.webView = webkit2.NewWebView()
-	auth.webView.SetVisible(true)
-	// webView.Show()
+	// auth.webView.SetVisible(true)
+	auth.webView.Show()
+	cancelButton, err := gtk.ButtonNewWithLabel("Cancel")
+	if err != nil {
+		log.Fatal("Unable to create cancel button:", err)
+	}
+	cancelButton.Connect("clicked", func() {
+		auth.cancelled = true
+		auth.found = false        // insure consistency
+		auth.authWindow.Destroy() // which will trigger win destroy event
+	})
+	cancelButton.Show()
+
 	auth.webView.Connect("load-failed", func() {
 		fmt.Println("Load failed.")
 	})
@@ -90,6 +107,11 @@ func (auth *Authenticate) Setup() {
 		switch loadEvent {
 		case webkit2.LoadFinished:
 			fmt.Println("Load finished.")
+			vbox.Add(auth.webView)
+			vbox.Add(cancelButton)
+			auth.authWindow.Add(vbox)
+			fmt.Printf("C4")
+			//auth.authWindow.Add(auth.webView)
 			fmt.Printf("Title: %q\n", auth.webView.Title())
 			fmt.Printf("URI: %s\n", auth.webView.URI())
 			auth.webView.RunJavaScript("window.location.hostname", func(val *gojs.Value, err error) {
@@ -102,25 +124,6 @@ func (auth *Authenticate) Setup() {
 			})
 		}
 	})
-	cancelButton, err := gtk.ButtonNewWithLabel("Cancel")
-	if err != nil {
-		log.Fatal("Unable to create cancel button:", err)
-	}
-	cancelButton.Connect("clicked", func() {
-		auth.cancelled = true
-		auth.found = false        // insure consistency
-		auth.authWindow.Destroy() // which will trigger win destroy event
-	})
-	// cancelButton.Show()
-	// vbox.Add(auth.webView)
-	// auth.authWindow.Add(vbox)
-	auth.authWindow.Add(auth.webView)
-
-	// vbox.Add(cancelButton)
-}
-
-// Authenicate returns the code if successful, or non-nil error if not (code, err).
-func (auth *Authenticate) Run(scope string, clientID string) {
 
 	// form string
 	var code string
@@ -162,7 +165,7 @@ func (auth *Authenticate) Run(scope string, clientID string) {
 	// make the call
 	// c2 := make(chan bool)
 	// go func() {
-	auth.authWindow.ShowAll()
+	auth.authWindow.Show()
 	glib.IdleAdd(func() bool {
 		fmt.Printf("C2")
 		auth.webView.LoadURI(authURL) // blocks until it loads - requires UI
