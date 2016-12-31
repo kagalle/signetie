@@ -127,13 +127,13 @@ func (auth *Authenticate) Run(scope string, clientID string) {
 
 	// form string
 	var code string
-	authURL := "http://www.google.com"
+	// authURL := "http://www.google.com"
 
-	// authURL := fmt.Sprintf("https://accounts.google.com/o/oauth2/v2/auth?"+
-	// 	"scope=%s&"+
-	// 	"redirect_uri=http://127.0.0.1:8146&"+
-	// 	"response_type=code&"+
-	// 	"client_id=%s", scope, clientID)
+	authURL := fmt.Sprintf("https://accounts.google.com/o/oauth2/v2/auth?"+
+		"scope=%s&"+
+		"redirect_uri=http://127.0.0.1:8146&"+
+		"response_type=code&"+
+		"client_id=%s", scope, clientID)
 
 	// start the server to listen for the results
 	// http://stackoverflow.com/a/6329459
@@ -144,12 +144,12 @@ func (auth *Authenticate) Run(scope string, clientID string) {
 		http.HandleFunc("/",
 			func(w http.ResponseWriter, r *http.Request) {
 				fmt.Printf("B4")
-				fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
 				// http://stackoverflow.com/a/25606975
 				tempcode := r.URL.Query().Get("code")
 				if len(tempcode) != 0 {
 					code = tempcode
 				}
+				fmt.Fprintf(w, "Hello, %q  code=%s", html.EscapeString(r.URL.Path), code)
 				// io.WriteString(w, "Hello world!")
 				fmt.Printf("B5")
 			})
