@@ -1,81 +1,93 @@
 package gae
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
-	"html"
 	"log"
 	"net/http"
 
+	"github.com/go-errors/errors"
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
+	"github.com/phayes/freeport"
 	"github.com/sourcegraph/go-webkit2/webkit2"
-	"github.com/sqs/gojs"
 )
 
 // "github.com/sqs/gojs"
 
+// Authenticate is a class to handle the first part of the gae authentication process.
 type Authenticate struct {
-	*gtk.Window // default member
-	webView     *webkit2.WebView
-	authWindow  *gtk.Window
-	callback    AuthenticateComplete
-	found       bool
-	code        string
-	cancelled   bool
+	*gtk.Window  // default member
+	webView      *webkit2.WebView
+	parentWindow *gtk.Window
+	authWindow   *gtk.Window
+	callback     AuthenticateComplete
+	found        bool
+	code         string
+	cancelled    bool
+	port         int
 }
 
+// AuthenticateComplete defines a user-supplied function to be called
+// at completion of the process.
 type AuthenticateComplete func(auth *Authenticate) bool
 
+// NewAuthenticate is a constructor for Authenicate.
+// Provide the gtk main window and the callback function defintion.
 func NewAuthenticate(parentWindow *gtk.Window, authComplete AuthenticateComplete) *Authenticate {
 	auth := new(Authenticate)
-	auth.Window = parentWindow
+	auth.parentWindow = parentWindow
 	auth.callback = authComplete
-
-	// create new signal
-	//http://zetcode.com/gui/pygtk/signals/
-	//	GObject.type_register(GaeAuthenicate)
-	//	GObject.signal_new("authenticate_complete", GaeAuthenicate, GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, ())
-
+	auth.port = freeport.GetPort()
 	return auth
 }
 
-func (auth *Authenticate) GetCode() string {
+// Code is a getter for the resulting code from the gae authentication process.
+func (auth *Authenticate) Code() string {
 	return auth.code
 }
 
-func (auth *Authenticate) GetFound() bool {
+// Found is a getter; was the process successful.
+func (auth *Authenticate) Found() bool {
 	return auth.found
 }
 
-func (auth *Authenticate) GetCancelled() bool {
+func (auth *Authenticate) setFound() {
+	auth.found = true
+	auth.cancelled = false // insure consistency
+}
+
+// Cancelled is a getter; was the process cancelled by the user, either
+// by clicking the cancel button or by closing the authentate window prematurely.
+func (auth *Authenticate) Cancelled() bool {
 	return auth.cancelled
 }
-
-//	"cmd/internal/pprof/tempfile"
-
-func (auth *Authenticate) Setup() {
-
+func (auth *Authenticate) setCancelled() {
+	auth.found = false
+	auth.cancelled = true // insure consistency
 }
 
-// Authenicate returns the code if successful, or non-nil error if not (code, err).
-func (auth *Authenticate) Run(scope string, clientID string) {
+// Run is the main method which begins this first part of the authentation process.
+func (auth *Authenticate) Run(scope string, clientID string) (err error) {
 	// create window for browser
-	var err error
 	auth.authWindow, err = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
 	if err != nil {
-		log.Fatal("Unable to create authenticate window:", err)
+		return errors.WrapPrefix(err, "Unable to create authenticate window", 0)
 	}
 	auth.authWindow.SetDefaultSize(850, 600)
 	auth.authWindow.SetTitle("Authenticate")
+	// make authwindow a modal child window of the main window
 	auth.authWindow.SetModal(true)
-	auth.authWindow.SetTransientFor(auth.Window)
+	auth.authWindow.SetTransientFor(auth.parentWindow)
+	// close the auth window if the parent window is closing
 	auth.authWindow.SetDestroyWithParent(true)
+	// add event handler for when the auth window is closing
 	auth.authWindow.Connect("destroy", func() bool {
 		if (!auth.found) && (!auth.cancelled) {
-			auth.cancelled = true
+			auth.setCancelled()
 		}
 		auth.callback(auth)
-		fmt.Printf("B1")
 		return false // let the window close
 	})
 
@@ -83,102 +95,83 @@ func (auth *Authenticate) Run(scope string, clientID string) {
 	if err != nil {
 		log.Fatal("Unable to create vertical box:", err)
 	}
-	vbox.Show()
 
 	auth.webView = webkit2.NewWebView()
-	// auth.webView.SetVisible(true)
-	auth.webView.Show()
 	cancelButton, err := gtk.ButtonNewWithLabel("Cancel")
 	if err != nil {
 		log.Fatal("Unable to create cancel button:", err)
 	}
 	cancelButton.Connect("clicked", func() {
-		auth.cancelled = true
-		auth.found = false        // insure consistency
+		auth.setCancelled()
 		auth.authWindow.Destroy() // which will trigger win destroy event
 	})
-	cancelButton.Show()
-
 	auth.webView.Connect("load-failed", func() {
-		fmt.Println("Load failed.")
 	})
+	// Wait until the browser window is full of data so that it will display
+	// with size when added to the window.
+	// Only do this for the first load, based on whether window has any content yet
 	auth.webView.Connect("load-changed", func(_ *glib.Object, i int) {
 		loadEvent := webkit2.LoadEvent(i)
 		switch loadEvent {
 		case webkit2.LoadFinished:
-			fmt.Println("Load finished.")
-			vbox.Add(auth.webView)
-			vbox.Add(cancelButton)
-			auth.authWindow.Add(vbox)
-			fmt.Printf("C4")
-			//auth.authWindow.Add(auth.webView)
-			fmt.Printf("Title: %q\n", auth.webView.Title())
-			fmt.Printf("URI: %s\n", auth.webView.URI())
-			auth.webView.RunJavaScript("window.location.hostname", func(val *gojs.Value, err error) {
-				if err != nil {
-					fmt.Println("JavaScript error.")
-				} else {
-					fmt.Printf("Hostname (from JavaScript): %q\n", val)
-				}
-				// gtk.MainQuit()
-			})
+			childList := auth.authWindow.GetChildren()
+			if childList.Length() == 0 {
+				vbox.Add(auth.webView)
+				vbox.Add(cancelButton)
+				auth.authWindow.Add(vbox)
+				auth.webView.Show()
+				cancelButton.Show()
+				vbox.Show()
+			}
 		}
 	})
-
-	// form string
-	var code string
-	// authURL := "http://www.google.com"
-
+	state := randomDataBase64url(32)
 	authURL := fmt.Sprintf("https://accounts.google.com/o/oauth2/v2/auth?"+
 		"scope=%s&"+
-		"redirect_uri=http://127.0.0.1:8146&"+
+		"redirect_uri=http://127.0.0.1:%d&"+
 		"response_type=code&"+
-		"client_id=%s", scope, clientID)
-
+		"client_id=%s&"+
+		"state=%s", scope, auth.port, clientID, state)
 	// start the server to listen for the results
 	// http://stackoverflow.com/a/6329459
-	fmt.Printf("B2")
 	c1 := make(chan bool)
 	go func() {
-		fmt.Printf("B3")
 		http.HandleFunc("/",
 			func(w http.ResponseWriter, r *http.Request) {
-				fmt.Printf("B4")
 				// http://stackoverflow.com/a/25606975
 				tempcode := r.URL.Query().Get("code")
-				if len(tempcode) != 0 {
-					code = tempcode
+				tempstate := r.URL.Query().Get("state")
+				if (len(tempcode) != 0) && (state == tempstate) {
+					auth.setFound()
+					auth.code = tempcode
+					// ask the main thread to close the auth window
+					glib.IdleAdd(func() bool {
+						auth.authWindow.Destroy() // which will trigger win destroy event
+						return false
+					})
 				}
-				fmt.Fprintf(w, "Hello, %q  code=%s", html.EscapeString(r.URL.Path), code)
-				// io.WriteString(w, "Hello world!")
-				fmt.Printf("B5")
 			})
-		fmt.Printf("B6")
-		http.ListenAndServe(":8146", nil) // TODO make the port a parameter
-		fmt.Printf("B7")
+		http.ListenAndServe(fmt.Sprintf(":%d", auth.port), nil)
 		c1 <- true
-		// return false // ask IdleAdd() to not call this anonymous function again
 	}()
-	fmt.Printf("C1")
 
-	// do some other stuff here while the blocking function runs
-	// make the call
-	// c2 := make(chan bool)
-	// go func() {
+	// Once the server is up ready to receive the result,
+	// make the web call to open the gae authentation window.
 	auth.authWindow.Show()
-	glib.IdleAdd(func() bool {
-		fmt.Printf("C2")
-		auth.webView.LoadURI(authURL) // blocks until it loads - requires UI
-		fmt.Printf("C3")
-		// c2 <- true
-		return false
-	})
-	// }()
-	fmt.Printf("D")
+	auth.webView.LoadURI(authURL) // blocks until it loads - requires UI
+	return nil                    // no error
+}
 
-	// wait for the blocking function to finish if it hasn't already
-	// <-c
-	fmt.Printf("E")
-
-	// return code, err
+// ref:  https://github.com/googlesamples/oauth-apps-for-windows.git
+//     /OAuthDesktopApp/OAuthDesktopApp/MainWindow.xaml.cs
+func randomDataBase64url(length int) string {
+	var randomString string
+	// create byte array of length <length> full of random data
+	data := make([]byte, length)
+	_, err := rand.Read(data)
+	if err == nil {
+		// base 64 encode the byte array, creating a string
+		randomString = base64.StdEncoding.EncodeToString(data)
+	}
+	return randomString
 }
