@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/braintree/manners"
@@ -19,6 +20,7 @@ import (
 // at completion of the process.
 type AuthenticateComplete func(auth *Authenticate)
 
+// MyMux implements http/Handler and wraps variables needed when responding to the response.
 // https://astaxie.gitbooks.io/build-web-application-with-golang/content/en/03.4.html
 type MyMux struct {
 	state      string
@@ -26,6 +28,7 @@ type MyMux struct {
 	authWindow *gtk.Window
 }
 
+// NewMyMux is a constructor to create MyMux.
 func NewMyMux(state string, auth *Authenticate, authWindow *gtk.Window) *MyMux {
 	mux := new(MyMux)
 	mux.state = state
@@ -43,10 +46,10 @@ func (p *MyMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				p.auth.setFound()
 				p.auth.code = tempcode
 			} else {
-				p.auth.err = errors.WrapPrefix(p.auth.err, "Authentication code not returned from service", 0)
+				p.auth.err = errors.Errorf("Authentication code not returned from service")
 			}
 		} else {
-			p.auth.err = errors.WrapPrefix(p.auth.err, "Authentication received from incorrrect session", 0)
+			p.auth.err = errors.Errorf("Authentication received from incorrrect session: original=%s  returned=%s", p.state, tempstate)
 		}
 		// ask the main thread to close the auth window
 		glib.IdleAdd(func() bool {
@@ -116,7 +119,7 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 		authWindow.Destroy() // which will trigger win destroy event
 	})
 	webView.Connect("load-failed", func() {
-		auth.err = errors.WrapPrefix(err, "Unable to load authentication page", 0)
+		auth.err = errors.Errorf("Unable to load authentication page")
 		authWindow.Destroy() // which will trigger win destroy event
 	})
 	// Wait until the browser window is full of data so that it will display
@@ -137,39 +140,11 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 			}
 		}
 	})
-	authURL := fmt.Sprintf("https://accounts.google.com/o/oauth2/v2/auth?"+
-		"scope=%s&"+
-		"redirect_uri=http://127.0.0.1:%d&"+
-		"response_type=code&"+
-		"client_id=%s&"+
-		"state=%s", scope, port, clientID, state)
+
 	// start the server to listen for the results
 	// http://stackoverflow.com/a/6329459
-	c1 := make(chan bool)
 	go func() {
-		// http.HandleFunc("/",
-		// 	func(w http.ResponseWriter, r *http.Request) {
-		// 		// http://stackoverflow.com/a/25606975
-		// 		tempcode := r.URL.Query().Get("code")
-		// 		tempstate := r.URL.Query().Get("state")
-		// 		if state == tempstate {
-		// 			if len(tempcode) != 0 {
-		// 				auth.setFound()
-		// 				auth.code = tempcode
-		// 			} else {
-		// 				auth.err = errors.WrapPrefix(err, "Authentication code not returned from service", 0)
-		// 			}
-		// 		} else {
-		// 			auth.err = errors.WrapPrefix(err, "Authentication received from incorrrect session", 0)
-		// 		}
-		// 		// ask the main thread to close the auth window
-		// 		glib.IdleAdd(func() bool {
-		// 			authWindow.Destroy() // which will trigger win destroy event
-		// 			return false         // only have IdleAdd() call this once
-		// 		})
-		// 	})
 		server.ListenAndServe()
-		c1 <- true
 	}()
 
 	// Once the server is up ready to receive the result,
@@ -177,8 +152,19 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 	authWindow.Show()
 	// Note that although this blocks until the page is loaded,
 	// it doesn't block until the user completes the whole process.
-	webView.LoadURI(authURL) // blocks until it loads - requires UI
-	return nil               // no error
+	authURL := new(url.URL)
+	authURL.Scheme = "https"
+	authURL.Host = "accounts.google.com"
+	authURL.Path = "/o/oauth2/v2/auth"
+	authURLParams := url.Values{}
+	authURLParams.Set("scope", scope)
+	authURLParams.Set("redirect_uri", fmt.Sprintf("http://127.0.0.1:%d", port))
+	authURLParams.Set("response_type", "code")
+	authURLParams.Set("client_id", clientID)
+	authURLParams.Set("state", state)
+	authURL.RawQuery = authURLParams.Encode()
+	webView.LoadURI(authURL.String()) // blocks until it loads - requires UI
+	return nil                        // no error
 }
 
 // RandomDataBase64url creates a base64 encoded string of length bytes.
