@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/braintree/manners"
 	"github.com/go-errors/errors"
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
@@ -17,9 +19,52 @@ import (
 // at completion of the process.
 type AuthenticateComplete func(auth *Authenticate)
 
+// https://astaxie.gitbooks.io/build-web-application-with-golang/content/en/03.4.html
+type MyMux struct {
+	state      string
+	auth       *Authenticate
+	authWindow *gtk.Window
+}
+
+func NewMyMux(state string, auth *Authenticate, authWindow *gtk.Window) *MyMux {
+	mux := new(MyMux)
+	mux.state = state
+	mux.auth = auth
+	mux.authWindow = authWindow
+	return mux
+}
+
+func (p *MyMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/" {
+		tempcode := r.URL.Query().Get("code")
+		tempstate := r.URL.Query().Get("state")
+		if p.state == tempstate {
+			if len(tempcode) != 0 {
+				p.auth.setFound()
+				p.auth.code = tempcode
+			} else {
+				p.auth.err = errors.WrapPrefix(p.auth.err, "Authentication code not returned from service", 0)
+			}
+		} else {
+			p.auth.err = errors.WrapPrefix(p.auth.err, "Authentication received from incorrrect session", 0)
+		}
+		// ask the main thread to close the auth window
+		glib.IdleAdd(func() bool {
+			p.authWindow.Destroy() // which will trigger win destroy event
+			return false           // only have IdleAdd() call this once
+		})
+		return
+	}
+	http.NotFound(w, r)
+	return
+}
+
 // RequestAuthentication is the main method which begins this first part of the authentation process.
 func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID string, authCompleteCallback AuthenticateComplete) (err error) {
+
+	port := freeport.GetPort()
 	auth := new(Authenticate)
+	state := RandomDataBase64url(32)
 	var authWindow *gtk.Window
 	// create window for browser
 	authWindow, err = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
@@ -27,6 +72,16 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 		authWindow.Destroy() // which will trigger win destroy event
 		return errors.WrapPrefix(err, "Unable to create authenticate window", 0)
 	}
+
+	mux := NewMyMux(state, auth, authWindow)
+	server := manners.NewWithServer(&http.Server{
+		Addr:           fmt.Sprintf(":%d", port),
+		Handler:        mux,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	})
+
 	authWindow.SetDefaultSize(850, 600)
 	authWindow.SetTitle("Authenticate")
 	// make authwindow a modal child window of the main window
@@ -39,6 +94,7 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 		if (!auth.found) && (!auth.cancelled) && (auth.err == nil) {
 			auth.setCancelled()
 		}
+		server.BlockingClose()
 		authCompleteCallback(auth)
 		return false // let the window close
 	})
@@ -81,8 +137,6 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 			}
 		}
 	})
-	port := freeport.GetPort()
-	state := RandomDataBase64url(32)
 	authURL := fmt.Sprintf("https://accounts.google.com/o/oauth2/v2/auth?"+
 		"scope=%s&"+
 		"redirect_uri=http://127.0.0.1:%d&"+
@@ -93,28 +147,28 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 	// http://stackoverflow.com/a/6329459
 	c1 := make(chan bool)
 	go func() {
-		http.HandleFunc("/",
-			func(w http.ResponseWriter, r *http.Request) {
-				// http://stackoverflow.com/a/25606975
-				tempcode := r.URL.Query().Get("code")
-				tempstate := r.URL.Query().Get("state")
-				if state == tempstate {
-					if len(tempcode) != 0 {
-						auth.setFound()
-						auth.code = tempcode
-					} else {
-						auth.err = errors.WrapPrefix(err, "Authentication code not returned from service", 0)
-					}
-				} else {
-					auth.err = errors.WrapPrefix(err, "Authentication received from incorrrect session", 0)
-				}
-				// ask the main thread to close the auth window
-				glib.IdleAdd(func() bool {
-					authWindow.Destroy() // which will trigger win destroy event
-					return false         // only have IdleAdd() call this once
-				})
-			})
-		http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+		// http.HandleFunc("/",
+		// 	func(w http.ResponseWriter, r *http.Request) {
+		// 		// http://stackoverflow.com/a/25606975
+		// 		tempcode := r.URL.Query().Get("code")
+		// 		tempstate := r.URL.Query().Get("state")
+		// 		if state == tempstate {
+		// 			if len(tempcode) != 0 {
+		// 				auth.setFound()
+		// 				auth.code = tempcode
+		// 			} else {
+		// 				auth.err = errors.WrapPrefix(err, "Authentication code not returned from service", 0)
+		// 			}
+		// 		} else {
+		// 			auth.err = errors.WrapPrefix(err, "Authentication received from incorrrect session", 0)
+		// 		}
+		// 		// ask the main thread to close the auth window
+		// 		glib.IdleAdd(func() bool {
+		// 			authWindow.Destroy() // which will trigger win destroy event
+		// 			return false         // only have IdleAdd() call this once
+		// 		})
+		// 	})
+		server.ListenAndServe()
 		c1 <- true
 	}()
 
