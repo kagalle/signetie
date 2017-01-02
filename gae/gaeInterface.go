@@ -4,11 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"net/http"
 	"net/url"
-	"time"
 
-	"github.com/braintree/manners"
 	"github.com/go-errors/errors"
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
@@ -19,48 +16,6 @@ import (
 // AuthenticateComplete defines a user-supplied function to be called
 // at completion of the process.
 type AuthenticateComplete func(auth *Authenticate)
-
-// MyMux implements http/Handler and wraps variables needed when responding to the response.
-// https://astaxie.gitbooks.io/build-web-application-with-golang/content/en/03.4.html
-type MyMux struct {
-	state      string
-	auth       *Authenticate
-	authWindow *gtk.Window
-}
-
-// NewMyMux is a constructor to create MyMux.
-func NewMyMux(state string, auth *Authenticate, authWindow *gtk.Window) *MyMux {
-	mux := new(MyMux)
-	mux.state = state
-	mux.auth = auth
-	mux.authWindow = authWindow
-	return mux
-}
-
-func (p *MyMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/" {
-		tempcode := r.URL.Query().Get("code")
-		tempstate := r.URL.Query().Get("state")
-		if p.state == tempstate {
-			if len(tempcode) != 0 {
-				p.auth.setFound()
-				p.auth.code = tempcode
-			} else {
-				p.auth.err = errors.Errorf("Authentication code not returned from service")
-			}
-		} else {
-			p.auth.err = errors.Errorf("Authentication received from incorrrect session: original=%s  returned=%s", p.state, tempstate)
-		}
-		// ask the main thread to close the auth window
-		glib.IdleAdd(func() bool {
-			p.authWindow.Destroy() // which will trigger win destroy event
-			return false           // only have IdleAdd() call this once
-		})
-		return
-	}
-	http.NotFound(w, r)
-	return
-}
 
 // RequestAuthentication is the main method which begins this first part of the authentation process.
 func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID string, authCompleteCallback AuthenticateComplete) (err error) {
@@ -76,14 +31,7 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 		return errors.WrapPrefix(err, "Unable to create authenticate window", 0)
 	}
 
-	mux := NewMyMux(state, auth, authWindow)
-	server := manners.NewWithServer(&http.Server{
-		Addr:           fmt.Sprintf(":%d", port),
-		Handler:        mux,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
-	})
+	server := NewServer(port, state, auth, parentWindow)
 
 	authWindow.SetDefaultSize(850, 600)
 	authWindow.SetTitle("Authenticate")
