@@ -11,9 +11,9 @@ import (
 	"github.com/gotk3/gotk3/gtk"
 )
 
-// NewServer is a constructor to receive and process the result of the authentication request.
-func NewServer(port int, state string, auth *Authenticate, authWindow *gtk.Window) *manners.GracefulServer {
-	mux := newMyMux(state, auth, authWindow)
+// AuthServer is a constructor to receive and process the result of the authentication request.
+func NewAuthServer(port int, state string, auth *Authenticate, authWindow *gtk.Window) *manners.GracefulServer {
+	mux := newAuthMux(state, auth, authWindow)
 	server := manners.NewWithServer(&http.Server{
 		Addr:           fmt.Sprintf(":%d", port),
 		Handler:        mux,
@@ -24,24 +24,24 @@ func NewServer(port int, state string, auth *Authenticate, authWindow *gtk.Windo
 	return server
 }
 
-// MyMux implements http/Handler and wraps variables needed when responding to the response.
+// authMux implements http/Handler and wraps variables needed when responding to the response.
 // https://astaxie.gitbooks.io/build-web-application-with-golang/content/en/03.4.html
-type myMux struct {
+type authMux struct {
 	state      string
 	auth       *Authenticate
 	authWindow *gtk.Window
 }
 
-// NewMyMux is a constructor to create MyMux.
-func newMyMux(state string, auth *Authenticate, authWindow *gtk.Window) *myMux {
-	mux := new(myMux)
+// NewAuthMux is a constructor to create MyMux.
+func newAuthMux(state string, auth *Authenticate, authWindow *gtk.Window) *authMux {
+	mux := new(authMux)
 	mux.state = state
 	mux.auth = auth
 	mux.authWindow = authWindow
 	return mux
 }
 
-func (p *myMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (p *authMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
 		tempcode := r.URL.Query().Get("code")
 		tempstate := r.URL.Query().Get("state")

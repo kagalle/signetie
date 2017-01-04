@@ -20,6 +20,7 @@ func main() {
 	win.SetDefaultSize(850, 600)
 	win.SetTitle("Signetie")
 	win.Connect("destroy", func() {
+		fmt.Printf("Quitting\n")
 		gtk.MainQuit()
 	})
 
@@ -51,6 +52,16 @@ func afterRequestAuthentication(auth *gae.Authenticate) {
 	if auth.Found() {
 		fmt.Printf("Code obtained %s\n", auth.Code())
 		continueOn = true
+
+		// RequestAccessToken(authCode string, clientID string, clientSecret string) (string, error)
+		accessToken, err := gae.RequestAccessToken(auth.Code(),
+			"192820621204-nrkum19gt8a7hjrrkrdpdhh2qgmi0toq.apps.googleusercontent.com",
+			"Tx3wbyqLBjDFOH7l-ZXr7-Ot")
+		if err != nil {
+			log.Fatal("Unable to exchange code for token:", err)
+		}
+		fmt.Printf("token_response:%s", accessToken)
+
 	} else if auth.Cancelled() {
 		fmt.Printf("User canceled authenticate\n")
 	} else {

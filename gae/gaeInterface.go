@@ -11,6 +11,7 @@ import (
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/phayes/freeport"
 	"github.com/sourcegraph/go-webkit2/webkit2"
+	"github.com/sqs/gojs"
 )
 
 // AuthenticateComplete defines a user-supplied function to be called
@@ -31,7 +32,7 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 		return errors.WrapPrefix(err, "Unable to create authenticate window", 0)
 	}
 
-	server := NewServer(port, state, auth, parentWindow)
+	server := NewAuthServer(port, state, auth, authWindow)
 
 	authWindow.SetDefaultSize(850, 600)
 	authWindow.SetTitle("Authenticate")
@@ -113,6 +114,55 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 	authURL.RawQuery = authURLParams.Encode()
 	webView.LoadURI(authURL.String()) // blocks until it loads - requires UI
 	return nil                        // no error
+}
+
+// RequestAccessToken takes code obtained from previous step and converts it into a token.
+func RequestAccessToken(authCode string, clientID string, clientSecret string) (string, error) /* *AccessToken */ {
+	// params := url.Values{}
+	port := freeport.GetPort()
+	state := RandomDataBase64url(32)
+	server := NewTokenServer(port, state, authCode, clientID, clientSecret)
+	go func() {
+		server.ListenAndServe()
+	}()
+
+	webView := webkit2.NewWebView()
+
+	webView.Connect("load-changed", func(_ *glib.Object, i int) {
+		loadEvent := webkit2.LoadEvent(i)
+		switch loadEvent {
+		case webkit2.LoadFinished:
+			fmt.Printf("JS\n")
+			webView.RunJavaScript("document.getElementById('token_form').submit();", func(g *gojs.Value, err error) {
+				// java script callback
+				fmt.Printf("Javascript call back: %s\n", err)
+				return
+			})
+		}
+	})
+	fmt.Printf("load\n")
+	webView.LoadURI(fmt.Sprintf("http://localhost:%d/load", port))
+
+	// params.Set("code", authCode)
+	// params.Set("client_id", clientID)
+	// params.Set("client_secret", clientSecret)
+	// // The redirect_uri comes from the "Download JSON" button in the edit client_id screen in the API Manager.
+	// // Apparently for type "other" it can't be edited - you are just assigned this a a usable value.
+	// params.Set("redirect_uri", fmt.Sprintf("http://localhost:%d", port))
+	// params.Set("grant_type", "authorization_code")
+	// resp, err := http.PostForm("https://www.googleapis.com/oauth2/v4/token", params)
+	// if err != nil {
+	// 	return "", errors.WrapPrefix(err, "Unable to convert code into token", 0)
+	// }
+	// defer resp.Body.Close()
+	// body, err := ioutil.ReadAll(resp.Body)
+	// if err != nil {
+	// 	return "", errors.WrapPrefix(err, "Unable to read get token response", 0)
+	// }
+
+	// return string(body[:]), nil
+	// Need to parse the JSON response and look for {"error": "something", "error_description": "something has detail"}
+	return "", nil
 }
 
 // RandomDataBase64url creates a base64 encoded string of length bytes.
