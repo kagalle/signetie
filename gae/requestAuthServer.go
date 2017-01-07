@@ -42,6 +42,7 @@ func newAuthMux(state string, auth *Authenticate, authWindow *gtk.Window) *authM
 }
 
 func (p *authMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("auth server method=%s  url=%s\n", r.Method, r.URL.Path)
 	if r.URL.Path == "/" {
 		tempcode := r.URL.Query().Get("code")
 		tempstate := r.URL.Query().Get("state")

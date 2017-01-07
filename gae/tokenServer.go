@@ -46,7 +46,7 @@ func newTokenMux(state string, authCode string, clientID string, clientSecret st
 
 func (p *tokenMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// document.getElementById('token_form').submit();
-	fmt.Printf("server url=%s\n", r.URL.Path)
+	fmt.Printf("token server method=%s  url=%s\n", r.Method, r.URL.Path)
 	if r.URL.Path == "/load" {
 		fmt.Printf("server load\n")
 		w.Write([]byte(fmt.Sprintf("<html><body><form id=\"token_form\" action=\"https://www.googleapis.com/oauth2/v4/token\" method=\"post\">"+
