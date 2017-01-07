@@ -9,7 +9,6 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
-	"github.com/phayes/freeport"
 	"github.com/sourcegraph/go-webkit2/webkit2"
 	"github.com/sqs/gojs"
 )
@@ -21,7 +20,7 @@ type AuthenticateComplete func(auth *Authenticate)
 // RequestAuthentication is the main method which begins this first part of the authentation process.
 func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID string, authCompleteCallback AuthenticateComplete) (err error) {
 
-	port := freeport.GetPort()
+	port := 7777 // freeport.GetPort()
 	auth := new(Authenticate)
 	state := RandomDataBase64url(32)
 	var authWindow *gtk.Window
@@ -107,7 +106,8 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 	authURL.Path = "/o/oauth2/v2/auth"
 	authURLParams := url.Values{}
 	authURLParams.Set("scope", scope)
-	authURLParams.Set("redirect_uri", fmt.Sprintf("http://127.0.0.1:%d", port))
+	authURLParams.Set("redirect_uri", fmt.Sprintf("http://localhost:%d", port))
+	//"http://localhost")
 	authURLParams.Set("response_type", "code")
 	authURLParams.Set("client_id", clientID)
 	authURLParams.Set("state", state)
@@ -119,25 +119,84 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 // RequestAccessToken takes code obtained from previous step and converts it into a token.
 func RequestAccessToken(authCode string, clientID string, clientSecret string) (string, error) /* *AccessToken */ {
 	// params := url.Values{}
-	port := freeport.GetPort()
+	port := 7777 // freeport.GetPort()
 	state := RandomDataBase64url(32)
 	server := NewTokenServer(port, state, authCode, clientID, clientSecret)
 	go func() {
 		server.ListenAndServe()
 	}()
 
+	authWindow, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
+	if err != nil {
+		authWindow.Destroy() // which will trigger win destroy event
+		return "", errors.WrapPrefix(err, "Unable to create authenticate window", 0)
+	}
+	authWindow.SetDefaultSize(850, 600)
+	authWindow.SetTitle("Authenticate")
+	// make authwindow a modal child window of the main window
+	authWindow.SetModal(true)
+	// authWindow.SetTransientFor(parentWindow)
+	// close the auth window if the parent window is closing
+	authWindow.SetDestroyWithParent(true)
+	// add event handler for when the auth window is closing
+	authWindow.Connect("destroy", func() bool {
+		server.BlockingClose()
+		return false // let the window close
+	})
+	// add box for layout
+	vbox, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 6)
+	if err != nil {
+		authWindow.Destroy() // which will trigger win destroy event
+		return "", errors.WrapPrefix(err, "Unable to create vertical box", 0)
+	}
+	// create the webview browser
 	webView := webkit2.NewWebView()
+	cancelButton, err := gtk.ButtonNewWithLabel("Cancel")
+	if err != nil {
+		authWindow.Destroy() // which will trigger win destroy event
+		return "", errors.WrapPrefix(err, "Unable to create cancel button", 0)
+	}
+	cancelButton.Connect("clicked", func() {
+		authWindow.Destroy() // which will trigger win destroy event
+	})
+	runButton, err := gtk.ButtonNewWithLabel("Run")
+	if err != nil {
+		authWindow.Destroy() // which will trigger win destroy event
+		return "", errors.WrapPrefix(err, "Unable to create run button", 0)
+	}
+	runButton.Connect("clicked", func() {
+		fmt.Printf("JS\n")
+		webView.RunJavaScript("document.getElementById(\"token_form\").submit()", func(val *gojs.Value, err error) {
+			if err != nil {
+				fmt.Printf("JavaScript error  %s\n", err)
+			} else {
+				fmt.Printf("Hostname (from JavaScript): %q\n", val)
+			}
+			// java script callback
+			// return
+		})
+	})
+	webView.Connect("load-failed", func() {
+		authWindow.Destroy() // which will trigger win destroy event
+		fmt.Printf("Unable to load authentication page\n")
+	})
 
 	webView.Connect("load-changed", func(_ *glib.Object, i int) {
 		loadEvent := webkit2.LoadEvent(i)
 		switch loadEvent {
 		case webkit2.LoadFinished:
-			fmt.Printf("JS\n")
-			webView.RunJavaScript("document.getElementById('token_form').submit();", func(g *gojs.Value, err error) {
-				// java script callback
-				fmt.Printf("Javascript call back: %s\n", err)
-				return
-			})
+			childList := authWindow.GetChildren()
+			if childList.Length() == 0 {
+				vbox.Add(webView)
+				vbox.Add(cancelButton)
+				vbox.Add(runButton)
+				authWindow.Add(vbox)
+				webView.Show()
+				cancelButton.Show()
+				runButton.Show()
+				vbox.Show()
+				authWindow.Show()
+			}
 		}
 	})
 	fmt.Printf("load\n")
