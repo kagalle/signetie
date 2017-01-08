@@ -36,7 +36,7 @@ func main() {
 	}
 	runButton.Connect("clicked", func() {
 		port := freeport.GetPort() // 7777
-
+		
 		// RequestAuthentication(parentWindow, scope, client_id, callback)
 		err := gae.RequestAuthentication(win, "https://www.googleapis.com/auth/userinfo.profile",
 			"192820621204-nrkum19gt8a7hjrrkrdpdhh2qgmi0toq.apps.googleusercontent.com", port,

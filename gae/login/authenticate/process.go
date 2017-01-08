@@ -1,8 +1,6 @@
 package gae
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -14,15 +12,48 @@ import (
 	"github.com/sourcegraph/go-webkit2/webkit2"
 )
 
-// AuthenticateComplete defines a user-supplied function to be called
+// TODO: the authenticate part of this might as well move into Data, and Data be changed to authenciateResult.
+// that leaves this class to call out to do the authenticate if needed, followed by the code/token exchange.
+
+// authenticateComplete defines a user-supplied function to be called
 // at completion of the process.
-type AuthenticateComplete func(auth *Authenticate, port int)
+// type loginComplete func(data *Data, port int)
+
+// TODO: needs to return a structure that contains
+//  access_token, id_token (decode the JWT into user fields needed), refresh_token, expires_in (or convert to expires_on:date/time).
+func GaeLoginWithoutRefreshToken(scope string, clientID string, clientSecret string) {
+
+}
+
+func GaeLoginWithRefreshToken(scope string, clientID string, clientSecret string) {
+
+}
+
+// AuthenticateComplete is a callback function to communicate both from the server to here, and from here to the caller.
+type AuthenticateComplete func(output *Output)
+
+// Data shared by both the authentication process and code/token exchange process.
+// type gaeLogin struct {
+// 	scope        string
+// 	clientID     string
+// 	clientSecret string
+// 	port         int
+// }
+
+// // constructor to create ageLogin object.
+// func newGaeLogin(scope string, clientID string, clientSecret string) *gaeLogin {
+// 	login := new(gaeLogin)
+// 	login.scope = scope
+// 	login.clientID = clientID
+// 	login.clientSecret = clientSecret
+// 	return login
+// }
 
 // RequestAuthentication is the main method which begins this first part of the authentation process.
-func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID string, port int, authCompleteCallback AuthenticateComplete) (err error) {
+func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID string, port int, processCallback AuthenticateComplete) error {
 
-	auth := new(Authenticate)
-	state := RandomDataBase64url(32)
+	var err error
+	input := newInput(scope, clientID)
 	var authWindow *gtk.Window
 	// create window for browser
 	authWindow, err = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
@@ -31,22 +62,29 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 		return errors.WrapPrefix(err, "Unable to create authenticate window", 0)
 	}
 
-	server := NewAuthServer(port, state, auth, authWindow)
+	server := NewAuthServer(input, func(output *Output) {
+		// this is the server's thread, so ask the main thread for this
+		glib.IdleAdd(func() bool {
+			authWindow.Destroy() // which will trigger win destroy event
+			// authCompleteCallback calls the processCallback
+			processCallback(output)
+			return false // only have IdleAdd() call this once
+		})
+	})
 
 	authWindow.SetDefaultSize(850, 600)
 	authWindow.SetTitle("Authenticate")
 	// make authwindow a modal child window of the main window
 	authWindow.SetModal(true)
 	authWindow.SetTransientFor(parentWindow)
-	// close the auth window if the parent window is closing
+	// close the data window if the parent window is closing
 	authWindow.SetDestroyWithParent(true)
-	// add event handler for when the auth window is closing
+	// add event handler for when the data window is closing
 	authWindow.Connect("destroy", func() bool {
-		if (!auth.found) && (!auth.cancelled) && (auth.err == nil) {
-			auth.setCancelled()
-		}
+		// if (!data.found) && (!data.cancelled) && (data.err == nil) {
+		// 	data.setCancelled()
+		// }
 		server.BlockingClose()
-		authCompleteCallback(auth, port)
 		return false // let the window close
 	})
 	// add box for layout
@@ -63,11 +101,11 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 		return errors.WrapPrefix(err, "Unable to create cancel button", 0)
 	}
 	cancelButton.Connect("clicked", func() {
-		auth.setCancelled()
+		//data.setCancelled()
 		authWindow.Destroy() // which will trigger win destroy event
 	})
 	webView.Connect("load-failed", func() {
-		auth.err = errors.Errorf("Unable to load authentication page")
+		fmt.Printf("Unable to load authentication page")
 		authWindow.Destroy() // which will trigger win destroy event
 	})
 	// Wait until the browser window is full of data so that it will display
@@ -100,18 +138,19 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 	authWindow.Show()
 	// Note that although this blocks until the page is loaded,
 	// it doesn't block until the user completes the whole process.
-	authURL := new(url.URL)
-	authURL.Scheme = "https"
-	authURL.Host = "accounts.google.com"
-	authURL.Path = "/o/oauth2/v2/auth"
-	authURLParams := url.Values{}
-	authURLParams.Set("scope", scope)
-	authURLParams.Set("redirect_uri", fmt.Sprintf("http://localhost:%d", port))
-	//"http://localhost")
-	authURLParams.Set("response_type", "code")
-	authURLParams.Set("client_id", clientID)
-	authURLParams.Set("state", state)
-	authURL.RawQuery = authURLParams.Encode()
+	// authURL := new(url.URL)
+	// authURL.Scheme = "https"
+	// authURL.Host = "accounts.google.com"
+	// authURL.Path = "/o/oauth2/v2/data"
+	// authURLParams := url.Values{}
+	// authURLParams.Set("scope", scope)
+	// authURLParams.Set("redirect_uri", fmt.Sprintf("http://localhost:%d", port))
+	// //"http://localhost")
+	// authURLParams.Set("response_type", "code")
+	// authURLParams.Set("client_id", clientID)
+	// authURLParams.Set("state", state)
+	// authURL.RawQuery = authURLParams.Encode()
+	url := server.FormAuthURL()
 	webView.LoadURI(authURL.String()) // blocks until it loads - requires UI
 	return nil                        // no error
 }
@@ -134,9 +173,9 @@ func RequestAccessToken(authCode string, clientID string, clientSecret string, p
 		// make authwindow a modal child window of the main window
 		authWindow.SetModal(true)
 		// authWindow.SetTransientFor(parentWindow)
-		// close the auth window if the parent window is closing
+		// close the data window if the parent window is closing
 		authWindow.SetDestroyWithParent(true)
-		// add event handler for when the auth window is closing
+		// add event handler for when the data window is closing
 		authWindow.Connect("destroy", func() bool {
 			server.BlockingClose()
 			return false // let the window close
@@ -229,19 +268,4 @@ func RequestAccessToken(authCode string, clientID string, clientSecret string, p
 	return string(body[:]), nil
 	// Need to parse the JSON response and look for {"error": "something", "error_description": "something has detail"}
 	// return "", nil
-}
-
-// RandomDataBase64url creates a base64 encoded string of length bytes.
-// ref:  https://github.com/googlesamples/oauth-apps-for-windows.git
-//     /OAuthDesktopApp/OAuthDesktopApp/MainWindow.xaml.cs
-func RandomDataBase64url(length int) string {
-	var randomString string
-	// create byte array of length <length> full of random data
-	data := make([]byte, length)
-	_, err := rand.Read(data)
-	if err == nil {
-		// base 64 encode the byte array, creating a string
-		randomString = base64.StdEncoding.EncodeToString(data)
-	}
-	return randomString
 }
