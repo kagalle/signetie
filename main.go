@@ -6,8 +6,7 @@ import (
 	"runtime"
 
 	"github.com/gotk3/gotk3/gtk"
-	"github.com/kagalle/signetie/client_golang/gae"
-	"github.com/phayes/freeport"
+	"github.com/kagalle/signetie/client_golang/gae/login"
 )
 
 func main() {
@@ -35,44 +34,13 @@ func main() {
 		log.Fatal("Unable to create run button:", err)
 	}
 	runButton.Connect("clicked", func() {
-		port := freeport.GetPort() // 7777
-		
-		// RequestAuthentication(parentWindow, scope, client_id, callback)
-		err := gae.RequestAuthentication(win, "https://www.googleapis.com/auth/userinfo.profile",
-			"192820621204-nrkum19gt8a7hjrrkrdpdhh2qgmi0toq.apps.googleusercontent.com", port,
-			afterRequestAuthentication)
-		if err != nil {
-			log.Fatal(err)
-		}
+		login := login.NewGaeLogin(win,
+			"https://www.googleapis.com/auth/userinfo.profile",                         // scope
+			"192820621204-nrkum19gt8a7hjrrkrdpdhh2qgmi0toq.apps.googleusercontent.com", // clientID
+			"Tx3wbyqLBjDFOH7l-ZXr7-Ot")                                                 // client secret
+		login.GaeLoginWithoutRefreshToken()
 	})
 	vbox.Add(runButton)
 	win.ShowAll()
 	gtk.Main()
-}
-
-func afterRequestAuthentication(auth *gae.Authenticate, port int) {
-	continueOn := false
-	if auth.Found() {
-		fmt.Printf("Code obtained %s\n", auth.Code())
-		continueOn = true
-
-		// RequestAccessToken(authCode string, clientID string, clientSecret string) (string, error)
-		accessToken, err := gae.RequestAccessToken(auth.Code(),
-			"192820621204-nrkum19gt8a7hjrrkrdpdhh2qgmi0toq.apps.googleusercontent.com",
-			"Tx3wbyqLBjDFOH7l-ZXr7-Ot", port)
-		if err != nil {
-			log.Fatal("Unable to exchange code for token:", err)
-		}
-		fmt.Printf("token_response:%s", accessToken)
-
-	} else if auth.Cancelled() {
-		fmt.Printf("User canceled authenticate\n")
-	} else {
-		log.Fatal(auth.Error())
-	}
-	if continueOn {
-		fmt.Printf("Continuing\n")
-	} else {
-		fmt.Printf("Not continuing\n")
-	}
 }

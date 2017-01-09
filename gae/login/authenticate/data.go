@@ -1,19 +1,25 @@
-package gae
+package authenticate
 
 import (
+	"fmt"
+
 	"github.com/go-errors/errors"
 	"github.com/phayes/freeport"
 )
+
+// ProcessCallback is a callback function to communicate both from the server to here, and from here to the caller.
+type ProcessCallback func(output *AuthOutput)
 
 type Input struct {
 	scope    string
 	clientID string
 	// clientSecret string
-	port int
+	port        int
+	redirectURI string
 }
 
 // constructor to create ageLogin object.
-func newInput(scope string, clientID string /*, clientSecret string*/) *Input {
+func NewInput(scope string, clientID string /*, clientSecret string*/) *Input {
 	input := new(Input)
 	input.scope = scope
 	input.clientID = clientID
@@ -22,15 +28,22 @@ func newInput(scope string, clientID string /*, clientSecret string*/) *Input {
 	return input
 }
 
-// func newOutput(code string, redirectURI string) *Output {
-// 	output := new(Output)
+func (input *Input) RedirectURI() string {
+	if input.redirectURI == "" {
+		input.redirectURI = fmt.Sprintf("http://localhost:%d", input.port)
+	}
+	return input.redirectURI
+}
+
+// func newOutput(code string, redirectURI string) *AuthOutput {
+// 	output := new(AuthOutput)
 // 	output.code = code
 // 	output.redirectURI = redirectURI
 // 	return output
 // }
 
-// Output is a class to handle the first part of the gae authentication process.
-type Output struct {
+// AuthOutput is a class to handle the first part of the gae authentication process.
+type AuthOutput struct {
 	// found       bool
 	code string
 	// cancelled   bool
@@ -39,34 +52,38 @@ type Output struct {
 }
 
 // Code is a getter for the resulting code from the gae authentication process.
-func (output *Output) Code() string {
+func (output *AuthOutput) Code() string {
 	return output.code
 }
 
-func (output *Output) RedirectURI() string {
+func (output *AuthOutput) RedirectURI() string {
 	return output.redirectURI
 }
 
+func (output *AuthOutput) SetRedirectURI(redirectURI string) {
+	output.redirectURI = redirectURI
+}
+
 // Found is a getter; was the process successful.
-// func (output *Output) Found() bool {
+// func (output *AuthOutput) Found() bool {
 // 	return output.found
 // }
 
-// func (output *Output) setFound() {
+// func (output *AuthOutput) setFound() {
 // 	output.found = true
 // 	output.cancelled = false // insure consistency
 // }
 
 // Cancelled is a getter; was the process cancelled by the user, either
 // by clicking the cancel button or by closing the authentate window prematurely.
-// func (output *Output) Cancelled() bool {
+// func (output *AuthOutput) Cancelled() bool {
 // 	return output.cancelled
 // }
-// func (output *Output) setCancelled() {
+// func (output *AuthOutput) setCancelled() {
 // 	output.found = false
 // 	output.cancelled = true // insure consistency
 // }
 
-// func (output *Output) Error() error {
+// func (output *AuthOutput) Error() error {
 // 	return output.err
 // }

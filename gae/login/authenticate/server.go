@@ -1,4 +1,4 @@
-package gae
+package authenticate
 
 import (
 	"fmt"
@@ -13,20 +13,20 @@ import (
 type AuthServer struct {
 	srv    *manners.GracefulServer
 	input  *Input
-	output *Output
+	output *AuthOutput
 	// authMux implements http/Handler and wraps variables needed when responding to the response.
 	// https://astaxie.gitbooks.io/build-web-application-with-golang/content/en/03.4.html
 	// type authMux struct {
 	state                string
-	authCompleteCallback AuthenticateComplete
+	authCompleteCallback ProcessCallback
 	// redirectURI          string
 	// }
 }
 
 // NewAuthServer is a constructor to receive and process the result of the authentication request.
-func NewAuthServer(input *Input, authCompleteCallback AuthenticateComplete) *AuthServer {
-	output := new(Output)
-	var authServer *AuthServer
+func NewAuthServer(input *Input, authCompleteCallback ProcessCallback) *AuthServer {
+	output := new(AuthOutput)
+	authServer := new(AuthServer)
 	// mux := newAuthMux(input, authCompleteCallback)
 	server := manners.NewWithServer(&http.Server{
 		Addr:           fmt.Sprintf(":%d", input.port),
@@ -36,24 +36,27 @@ func NewAuthServer(input *Input, authCompleteCallback AuthenticateComplete) *Aut
 		MaxHeaderBytes: 1 << 20,
 	})
 	state := util.RandomDataBase64url(32)
-	authServer = &AuthServer{server, input, output, state, authCompleteCallback}
+	authServer.srv = server
+	authServer.input = input
+	authServer.output = output
+	authServer.state = state
+	authServer.authCompleteCallback = authCompleteCallback
 	return authServer
 }
 
-// in:  clientID scope     out: redirectURI,
 func (p *AuthServer) FormAuthURL() string {
 	authURL := new(url.URL)
 	authURL.Scheme = "https"
 	authURL.Host = "accounts.google.com"
-	authURL.Path = "/o/oauth2/v2/output"
+	authURL.Path = "/o/oauth2/v2/auth"
 	authURLParams := url.Values{}
 	authURLParams.Set("scope", p.input.scope)
-	p.output.redirectURI = fmt.Sprintf("http://localhost:%d", p.input.port)
-	authURLParams.Set("redirect_uri", p.output.redirectURI)
+	authURLParams.Set("redirect_uri", p.input.RedirectURI())
 	authURLParams.Set("response_type", "code")
 	authURLParams.Set("client_id", p.input.clientID)
 	authURLParams.Set("state", p.state)
-	return authURLParams.Encode()
+	authURL.RawQuery = authURLParams.Encode()
+	return authURL.String()
 }
 
 func (p *AuthServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +67,7 @@ func (p *AuthServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if p.state == tempstate {
 			if len(tempcode) != 0 {
 				p.output.code = tempcode
+				p.output.SetRedirectURI(p.input.RedirectURI()) // pass this through
 				p.authCompleteCallback(p.output)
 			} else {
 				fmt.Printf("Authentication code not returned from service")
