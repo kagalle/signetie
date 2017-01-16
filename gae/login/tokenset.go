@@ -5,7 +5,8 @@ package login
 
 import "time"
 
-type LoginOutput struct {
+// TokenSet is what is needed to access a GAE API.
+type TokenSet struct {
 	accessToken  string
 	IDToken      string
 	refreshToken string

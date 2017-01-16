@@ -2,17 +2,26 @@ package authenticate
 
 import (
 	"fmt"
+	"net/url"
 
 	"github.com/go-errors/errors"
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
+	"github.com/kagalle/signetie/client_golang/gae/login/util"
 	"github.com/sourcegraph/go-webkit2/webkit2"
 )
 
-// RequestAuthentication is the main method which begins this first part of the authentation process.
-func RequestAuthentication(parentWindow *gtk.Window, input *Input, processCallback ProcessCallback) error {
+// AuthCompleteCallback defines the user-supplied method to be called with the auth code.
+type AuthCompleteCallback func(code string)
 
-	var err error
+// Authenticate is a class that does the authenicate with GAE, the result of which is a string code.
+type Authenticate string
+
+// RequestAuthentication is the main method which begins this first part of the authentation process.
+func (p Authenticate) RequestAuthentication(parentWindow *gtk.Window, scope string, clientID string,
+	port int, redirectURI string, callback AuthCompleteCallback) error {
+
+	var err error // return value
 	var authWindow *gtk.Window
 	// create window for browser
 	authWindow, err = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
@@ -21,13 +30,13 @@ func RequestAuthentication(parentWindow *gtk.Window, input *Input, processCallba
 		return errors.WrapPrefix(err, "Unable to create authenticate window", 0)
 	}
 
-	authServer := NewAuthServer(input, func(output *AuthOutput) {
+	state := util.RandomDataBase64url(32)
+	authServer := NewAuthServer(port, state, func(newCode string) {
+		p = Authenticate(newCode) // type assert that newCode, a string, is compatible with Authenicate
 		// this is the server's thread, so ask the main thread for this
 		glib.IdleAdd(func() bool {
 			authWindow.Destroy() // which will trigger win destroy event
-			// authCompleteCallback calls the processCallback
-			processCallback(output)
-			return false // only have IdleAdd() call this once
+			return false         // only have IdleAdd() call this once
 		})
 	})
 
@@ -86,19 +95,35 @@ func RequestAuthentication(parentWindow *gtk.Window, input *Input, processCallba
 		}
 	})
 
-	// start the server to listen for the results
-	// http://stackoverflow.com/a/6329459
-	go func() {
-		authServer.srv.ListenAndServe()
-	}()
-
 	// Once the server is up ready to receive the result,
 	// make the web call to open the gae authentation window.
 	authWindow.Show()
 	// Note that although this blocks until the page is loaded,
 	// it doesn't block until the user completes the whole process.
-	url := authServer.FormAuthURL()
+	url := formAuthURL(scope, clientID, port, state)
 	fmt.Printf("Auth url:%s", url)
 	webView.LoadURI(url)
+
+	// start the server to listen for the results
+	// http://stackoverflow.com/a/6329459
+	go func() {
+		authServer.srv.ListenAndServe()
+	}()
 	return nil // no error
+}
+
+func formAuthURL(scope string, clientID string, port int, state string) string {
+	redirectURI := fmt.Sprintf("http://localhost:%d", port)
+	authURL := new(url.URL)
+	authURL.Scheme = "https"
+	authURL.Host = "accounts.google.com"
+	authURL.Path = "/o/oauth2/v2/auth"
+	authURLParams := url.Values{}
+	authURLParams.Set("scope", scope)
+	authURLParams.Set("redirect_uri", redirectURI)
+	authURLParams.Set("response_type", "code")
+	authURLParams.Set("client_id", clientID)
+	authURLParams.Set("state", state)
+	authURL.RawQuery = authURLParams.Encode()
+	return authURL.String()
 }
