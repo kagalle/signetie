@@ -3,12 +3,22 @@ package login
 // TODO: needs to return a structure that contains
 //  access_token, id_token (decode the JWT into user fields needed), refresh_token, expires_in (or convert to expires_on:date/time).
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // TokenSet is what is needed to access a GAE API.
 type TokenSet struct {
-	accessToken  string
+	AccessToken  string
 	IDToken      string
-	refreshToken string
-	expiresOn    time.Time
+	RefreshToken string
+	ExpiresOn    time.Time
+}
+
+func (p *TokenSet) Print() {
+	fmt.Printf("accessToken:%s\n", p.AccessToken)
+	fmt.Printf("IDToken:%s\n", p.IDToken)
+	fmt.Printf("refreshToken:%s\n", p.RefreshToken)
+	fmt.Printf("expiresOn:%v\n", p.ExpiresOn)
 }

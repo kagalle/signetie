@@ -7,7 +7,7 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
-	"github.com/kagalle/signetie/client_golang/gae/login/util"
+	"github.com/kagalle/signetie/client_golang/gae/util"
 	"github.com/sourcegraph/go-webkit2/webkit2"
 )
 
@@ -100,7 +100,7 @@ func (p Authenticate) RequestAuthentication(parentWindow *gtk.Window, scope stri
 	authWindow.Show()
 	// Note that although this blocks until the page is loaded,
 	// it doesn't block until the user completes the whole process.
-	url := formAuthURL(scope, clientID, port, state)
+	url := formAuthURL(scope, clientID, redirectURI, state)
 	fmt.Printf("Auth url:%s", url)
 	webView.LoadURI(url)
 
@@ -112,8 +112,7 @@ func (p Authenticate) RequestAuthentication(parentWindow *gtk.Window, scope stri
 	return nil // no error
 }
 
-func formAuthURL(scope string, clientID string, port int, state string) string {
-	redirectURI := fmt.Sprintf("http://localhost:%d", port)
+func formAuthURL(scope string, clientID string, redirectURI string, state string) string {
 	authURL := new(url.URL)
 	authURL.Scheme = "https"
 	authURL.Host = "accounts.google.com"

@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/gotk3/gotk3/gtk"
-	"github.com/kagalle/signetie/client_golang/gae/login/authenticate"
-	"github.com/kagalle/signetie/client_golang/gae/login/codetoken"
+	"github.com/kagalle/signetie/client_golang/gae/authenticate"
 	"github.com/phayes/freeport"
 )
 
@@ -22,10 +21,8 @@ type GaeLogin struct {
 	clientSecret string
 }
 
-// I have a parent window regardless of the path
-// I have the scope regardless of the path needed
-// I have a clientID regardless of the path needed
-// I have a clientSecret regardless of the path needed
+// I have a parent window, scope, clientID, and clientSecret
+//  regardless of the code path needed
 func NewGaeLogin(parentWindow *gtk.Window, scope string, clientID string, clientSecret string) *GaeLogin {
 	login := new(GaeLogin)
 	login.parentWindow = parentWindow
@@ -37,59 +34,41 @@ func NewGaeLogin(parentWindow *gtk.Window, scope string, clientID string, client
 
 // Login calls appropriate code in order to get a valid tokenSet.
 // The input tokenSet may be nil.
-func (login *GaeLogin) Login(tokenSet TokenSet) TokenSet {
+func (login *GaeLogin) Login(tokenSet *TokenSet) *TokenSet {
 	// Determine if the accessToken in the tokenSet is stil valid.
 	if (tokenSet != nil) &&
-		(tokenSet.accessToken != "") &&
-		(tokenSet.expiresOn != nil) &&
-		(tokenSet.expiresOn.After(time.Now())) {
+		(tokenSet.AccessToken != "") &&
+		(tokenSet.ExpiresOn.After(time.Now())) {
 
 		// The current accessToken should still work
 		return tokenSet
-	} else if (tokenSet != nil) && (tokenSet.refreshToken != "") {
+	} else if (tokenSet != nil) && (tokenSet.RefreshToken != "") {
 		// Attempt to use the refreshToken to get a new accessToken
 		// TODO
+		return nil
 	} else {
 		// Nothing in the current tokenSet that I can use - get a new one
-		var authcode string
+		var tokenSet *TokenSet
+		var err error
 		port := freeport.GetPort() // 7777
-		redirectURI := 
-		auth := new authenticate.Authenticate()
+		redirectURI := fmt.Sprintf("http://localhost:%d", port)
+		auth := new(authenticate.Authenticate)
 		auth.RequestAuthentication(login.parentWindow, login.scope, login.clientID,
 			port, redirectURI, func(code string) {
-				authcode = code
+				fmt.Printf("Code obtained %s\n", code)
+				if code != "" {
+					tokenSet, err = RequestAccessToken(code, login.clientID,
+						login.clientSecret, redirectURI)
+
+					if err != nil {
+						log.Fatal("Unable to exchange code for token:", err)
+					}
+					if tokenSet != nil {
+						tokenSet.Print()
+					}
+				}
 			})
+		return tokenSet
 	}
 
-	// Determine if we need to authenicate again.
-
-	// If I was given a refresh token, then attempt to use that.
-	if (tokenSet.refreshToken != "") && (token) {
-		// TODO
-	} else {
-		//
-	}
-	input := authenticate.NewInput(login.scope, login.clientID)
-
-	
-	authenticate.RequestAuthentication(login.parentWindow, input, login.afterRequestAuthentication)
-
-}
-
-func (login *GaeLogin) GaeLoginWithRefreshToken() {
-
-}
-
-func (login *GaeLogin) afterRequestAuthentication(output *authenticate.AuthOutput) {
-	if output.Code() != "" {
-		fmt.Printf("Code obtained %s\n", output.Code())
-		// authCode string, clientID string, clientSecret string, redirectURI string
-		accessToken, err := codetoken.RequestAccessToken(output.Code(), login.clientID,
-			login.clientSecret, output.RedirectURI())
-
-		if err != nil {
-			log.Fatal("Unable to exchange code for token:", err)
-		}
-		fmt.Printf("token_response:%s", accessToken)
-	}
 }

@@ -34,11 +34,12 @@ func main() {
 		log.Fatal("Unable to create run button:", err)
 	}
 	runButton.Connect("clicked", func() {
-		login := login.NewGaeLogin(win,
+		gaeLogin := login.NewGaeLogin(win,
 			"https://www.googleapis.com/auth/userinfo.profile",                         // scope
 			"192820621204-nrkum19gt8a7hjrrkrdpdhh2qgmi0toq.apps.googleusercontent.com", // clientID
 			"Tx3wbyqLBjDFOH7l-ZXr7-Ot")                                                 // client secret
-		login.GaeLoginWithoutRefreshToken()
+		tokenSet := gaeLogin.Login(nil)
+		tokenSet.Print()
 	})
 	vbox.Add(runButton)
 	win.ShowAll()
