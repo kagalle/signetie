@@ -39,7 +39,9 @@ func main() {
 			"192820621204-nrkum19gt8a7hjrrkrdpdhh2qgmi0toq.apps.googleusercontent.com", // clientID
 			"Tx3wbyqLBjDFOH7l-ZXr7-Ot")                                                 // client secret
 		tokenSet := gaeLogin.Login(nil)
-		tokenSet.Print()
+		if tokenSet != nil {
+			tokenSet.Print()
+		}
 	})
 	vbox.Add(runButton)
 	win.ShowAll()

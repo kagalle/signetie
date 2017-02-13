@@ -1,4 +1,4 @@
-package authenticate
+package gaeAuthenticate
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
+	"github.com/kagalle/signetie/client_golang/gae/gaeAuthenticateHttpServer"
 	"github.com/kagalle/signetie/client_golang/gae/util"
 	"github.com/sourcegraph/go-webkit2/webkit2"
 )
@@ -14,11 +15,8 @@ import (
 // AuthCompleteCallback defines the user-supplied method to be called with the auth code.
 type AuthCompleteCallback func(code string)
 
-// Authenticate is a class that does the authenicate with GAE, the result of which is a string code.
-type Authenticate string
-
 // RequestAuthentication is the main method which begins this first part of the authentation process.
-func (p Authenticate) RequestAuthentication(parentWindow *gtk.Window, scope string, clientID string,
+func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID string,
 	port int, redirectURI string, callback AuthCompleteCallback) error {
 
 	var err error // return value
@@ -31,8 +29,8 @@ func (p Authenticate) RequestAuthentication(parentWindow *gtk.Window, scope stri
 	}
 
 	state := util.RandomDataBase64url(32)
-	authServer := NewAuthServer(port, state, func(newCode string) {
-		p = Authenticate(newCode) // type assert that newCode, a string, is compatible with Authenicate
+	authServer := gaeAuthenticateHttpServer.NewAuthServer(port, state, func(newCode string) {
+		callback(newCode) // pass the newly created code back to the caller.
 		// this is the server's thread, so ask the main thread for this
 		glib.IdleAdd(func() bool {
 			authWindow.Destroy() // which will trigger win destroy event
@@ -52,7 +50,7 @@ func (p Authenticate) RequestAuthentication(parentWindow *gtk.Window, scope stri
 		// if (!data.found) && (!data.cancelled) && (data.err == nil) {
 		// 	data.setCancelled()
 		// }
-		authServer.srv.BlockingClose()
+		authServer.BlockingClose()
 		return false // let the window close
 	})
 	// add box for layout
@@ -107,7 +105,7 @@ func (p Authenticate) RequestAuthentication(parentWindow *gtk.Window, scope stri
 	// start the server to listen for the results
 	// http://stackoverflow.com/a/6329459
 	go func() {
-		authServer.srv.ListenAndServe()
+		authServer.ListenAndServe()
 	}()
 	return nil // no error
 }

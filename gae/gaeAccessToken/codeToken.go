@@ -1,4 +1,4 @@
-package login
+package gaeAccessToken
 
 import (
 	"encoding/json"
