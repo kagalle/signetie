@@ -31,7 +31,7 @@ func RequestAccessToken(authCode string, clientID string, clientSecret string,
 	}
 	defer resp.Body.Close()
 	decoder := json.NewDecoder(resp.Body)
-	var jsonResponse ResponseData
+	var jsonResponse responseData
 	err = decoder.Decode(&jsonResponse)
 	if err != nil {
 		return nil, errors.WrapPrefix(err, "Unable to parse token response", 0)
@@ -51,22 +51,4 @@ func RequestAccessToken(authCode string, clientID string, clientSecret string,
 		}
 	}
 	return tokenSet, nil
-}
-
-/*
-{
- "access_token": "ya29.Ci_OA1i0TEGvr6Hk2pHKcuQ-c5NZbvi5Js-hemLwiOqsPUAGev5idIiLs8Kfat321A",
- "token_type": "Bearer",
- "expires_in": 3600,
- "refresh_token": "1/pt3Ihng4jCfKwjh176zO7WyqMuycHhbsU0YdJ4mb9MA",
- "id_token": "eyJ....."
-*/
-type ResponseData struct {
-	Error            string `json:"error"`
-	ErrorDescription string `json:"error_description"`
-	AccessToken      string `json:"access_token"`
-	TokenType        string `json:"token_type"`
-	ExpiresIn        int    `json:"expires_in"`
-	RefreshToken     string `json:"refresh_token"`
-	IDToken          string `json:"id_token"`
 }
