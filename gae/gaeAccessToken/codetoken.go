@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/go-errors/errors"
 )
 
@@ -22,7 +23,7 @@ func RequestAccessToken(authCode string, clientID string, clientSecret string,
 	// The redirect_uri comes from the "Download JSON" button in the edit client_id screen in the API Manager.
 	// Apparently for type "other" it can't be edited - you are just assigned this as a usable value.
 	params.Set("redirect_uri", redirectURI)
-	fmt.Printf("redirect_uri: %s\n", redirectURI)
+	logrus.WithFields(logrus.Fields{"redirect_uri": redirectURI}).Debug("")
 	params.Set("grant_type", "authorization_code")
 	// params.Set("state", state)
 	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v4/token", params)
@@ -36,7 +37,7 @@ func RequestAccessToken(authCode string, clientID string, clientSecret string,
 	if err != nil {
 		return nil, errors.WrapPrefix(err, "Unable to parse token response", 0)
 	}
-	fmt.Printf("response: %+v\n", jsonResponse)
+	logrus.WithFields(logrus.Fields{"response": jsonResponse}).Debug("")
 	tokenSet := new(TokenSet)
 	tokenSet.AccessToken = jsonResponse.AccessToken
 	tokenSet.IDToken = jsonResponse.IDToken

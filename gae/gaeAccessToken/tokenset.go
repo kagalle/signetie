@@ -4,8 +4,9 @@ package gaeAccessToken
 //  access_token, id_token (decode the JWT into user fields needed), refresh_token, expires_in (or convert to expires_on:date/time).
 
 import (
-	"fmt"
 	"time"
+
+	"github.com/Sirupsen/logrus"
 )
 
 // TokenSet is what is needed to access a GAE API.
@@ -16,9 +17,10 @@ type TokenSet struct {
 	ExpiresOn    time.Time
 }
 
-func (p *TokenSet) Print() {
-	fmt.Printf("accessToken:%s\n", p.AccessToken)
-	fmt.Printf("IDToken:%s\n", p.IDToken)
-	fmt.Printf("refreshToken:%s\n", p.RefreshToken)
-	fmt.Printf("expiresOn:%v\n", p.ExpiresOn)
+func (p *TokenSet) Log() {
+	logrus.WithFields(logrus.Fields{
+		"accessToken":  p.AccessToken,
+		"IDToken":      p.IDToken,
+		"refreshToken": p.RefreshToken,
+		"expiresOn":    p.ExpiresOn}).Debug("TokenSet")
 }

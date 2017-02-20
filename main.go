@@ -1,37 +1,57 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"errors"
 	"runtime"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/kagalle/signetie/client_golang/gae/login"
 )
 
+func init() {
+	logrus.SetLevel(logrus.DebugLevel)
+}
+
 func main() {
+	// http://stackoverflow.com/a/19934989
+	defer func() {
+		var err error
+		r := recover()
+		if r != nil {
+			switch x := r.(type) {
+			case string:
+				err = errors.New(x)
+			case error:
+				err = x
+			default:
+				err = errors.New("Unknown panic")
+			}
+			logrus.WithError(err).Error("Panic")
+		}
+	}()
 	// Initialize GTK without parsing any command line arguments.
 	runtime.LockOSThread()
 	gtk.Init(nil)
 	win, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
 	if err != nil {
-		log.Fatal("Unable to create window:", err)
+		logrus.WithError(err).Error("Unable to create window")
 	}
 	win.SetDefaultSize(850, 600)
 	win.SetTitle("Signetie")
 	win.Connect("destroy", func() {
-		fmt.Printf("Quitting\n")
+		logrus.Debugln("Quitting")
 		gtk.MainQuit()
 	})
 
 	vbox, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 6)
 	if err != nil {
-		log.Fatal("Unable to create vertical box:", err)
+		logrus.WithError(err).Error("Unable to create vertical box")
 	}
 	win.Add(vbox)
 	runButton, err := gtk.ButtonNewWithLabel("Run")
 	if err != nil {
-		log.Fatal("Unable to create run button:", err)
+		logrus.WithError(err).Error("Unable to create run button")
 	}
 	runButton.Connect("clicked", func() {
 		gaeLogin := login.NewGaeLogin(win,
@@ -40,7 +60,7 @@ func main() {
 			"Tx3wbyqLBjDFOH7l-ZXr7-Ot")                                                 // client secret
 		tokenSet := gaeLogin.Login(nil)
 		if tokenSet != nil {
-			tokenSet.Print()
+			tokenSet.Log()
 		}
 	})
 	vbox.Add(runButton)

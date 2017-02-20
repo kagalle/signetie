@@ -2,9 +2,9 @@ package login
 
 import (
 	"fmt"
-	"log"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/kagalle/signetie/client_golang/gae/gaeAccessToken"
 	"github.com/kagalle/signetie/client_golang/gae/gaeAuthenticate"
@@ -55,16 +55,16 @@ func (login *GaeLogin) Login(tokenSet *gaeAccessToken.TokenSet) *gaeAccessToken.
 		redirectURI := fmt.Sprintf("http://localhost:%d", port)
 		gaeAuthenticate.RequestAuthentication(login.parentWindow, login.scope, login.clientID,
 			port, redirectURI, func(code string) {
-				fmt.Printf("Code obtained %s\n", code)
+				logrus.WithField("Code obtained", code).Debug("gaeAuthenticate.RequestAuthentication() result")
 				if code != "" {
 					tokenSet, err = gaeAccessToken.RequestAccessToken(code, login.clientID,
 						login.clientSecret, redirectURI)
 
 					if err != nil {
-						log.Fatal("Unable to exchange code for token:", err)
+						logrus.WithError(err).Error("Unable to exchange code for token")
 					}
 					if tokenSet != nil {
-						tokenSet.Print()
+						tokenSet.Log()
 					}
 				}
 			})

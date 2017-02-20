@@ -1,9 +1,9 @@
 package gaeAuthenticate
 
 import (
-	"fmt"
 	"net/url"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/go-errors/errors"
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
@@ -71,7 +71,7 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 		authWindow.Destroy() // which will trigger win destroy event
 	})
 	webView.Connect("load-failed", func() {
-		fmt.Printf("Unable to load authentication page")
+		logrus.Error("Unable to load authentication page")
 		authWindow.Destroy() // which will trigger win destroy event
 	})
 	// Wait until the browser window is full of data so that it will display
@@ -99,7 +99,7 @@ func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID stri
 	// Note that although this blocks until the page is loaded,
 	// it doesn't block until the user completes the whole process.
 	url := formAuthURL(scope, clientID, redirectURI, state)
-	fmt.Printf("Auth url:%s", url)
+	logrus.WithFields(logrus.Fields{"url": url}).Debug("Auth")
 	webView.LoadURI(url)
 
 	// start the server to listen for the results

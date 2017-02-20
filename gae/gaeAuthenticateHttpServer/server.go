@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/braintree/manners"
 )
 
@@ -42,7 +43,7 @@ func NewAuthServer(port int, state string, callback authServerCallback) *AuthSer
 
 // Satisfies the Handler interface: ServeHTTP(ResponseWriter, *Request)
 func (p *AuthServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("output server method=%s  url=%s\n", r.Method, r.URL.Path)
+	logrus.WithFields(logrus.Fields{"method": r.Method, "url": r.URL.Path}).Debug("output server")
 	if r.URL.Path == "/" {
 		tempcode := r.URL.Query().Get("code")
 		tempstate := r.URL.Query().Get("state")
@@ -50,10 +51,10 @@ func (p *AuthServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if len(tempcode) != 0 {
 				p.callback(tempcode)
 			} else {
-				fmt.Printf("Authentication code not returned from service")
+				logrus.Error("Authentication code not returned from service")
 			}
 		} else {
-			fmt.Printf("Authentication received from incorrrect session: original=%s  returned=%s", p.state, tempstate)
+			logrus.WithFields(logrus.Fields{"original": tempstate, "returned": p.state}).Error("Authentication received from incorrrect session")
 		}
 	}
 	//	else {
