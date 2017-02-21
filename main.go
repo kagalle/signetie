@@ -10,6 +10,7 @@ import (
 )
 
 func init() {
+	// Ref Re: logging: https://dave.cheney.net/2015/11/05/lets-talk-about-logging
 	logrus.SetLevel(logrus.DebugLevel)
 }
 
