@@ -45,6 +45,17 @@ func (login *GaeLogin) Login(tokenSet *TokenSet) *TokenSet {
 	} else if (tokenSet != nil) && (tokenSet.RefreshToken != "") {
 		// Attempt to use the refreshToken to get a new accessToken
 		// TODO
+		/*
+					https://developers.google.com/identity/protocols/OAuth2InstalledApp#offline
+					POST /oauth2/v4/token HTTP/1.1
+			Host: www.googleapis.com
+			Content-Type: application/x-www-form-urlencoded
+
+			client_id=<your_client_id>&
+			client_secret=<your_client_secret>&
+			refresh_token=<refresh_token>&
+			grant_type=refresh_token
+		*/
 		return nil
 	} else {
 		// Nothing in the current tokenSet that I can use - get a new one
