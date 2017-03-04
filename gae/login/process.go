@@ -2,11 +2,12 @@ package login
 
 import (
 	"fmt"
-	"log"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gotk3/gotk3/gtk"
-	"github.com/kagalle/signetie/client_golang/gae/authenticate"
+	"github.com/kagalle/signetie/client_golang/gae/gaeAccessToken"
+	"github.com/kagalle/signetie/client_golang/gae/gaeAuthenticate"
 	"github.com/phayes/freeport"
 )
 
@@ -34,7 +35,7 @@ func NewGaeLogin(parentWindow *gtk.Window, scope string, clientID string, client
 
 // Login calls appropriate code in order to get a valid tokenSet.
 // The input tokenSet may be nil.
-func (login *GaeLogin) Login(tokenSet *TokenSet) *TokenSet {
+func (login *GaeLogin) Login(tokenSet *gaeAccessToken.TokenSet) *gaeAccessToken.TokenSet {
 	// Determine if the accessToken in the tokenSet is stil valid.
 	if (tokenSet != nil) &&
 		(tokenSet.AccessToken != "") &&
@@ -59,23 +60,22 @@ func (login *GaeLogin) Login(tokenSet *TokenSet) *TokenSet {
 		return nil
 	} else {
 		// Nothing in the current tokenSet that I can use - get a new one
-		var tokenSet *TokenSet
+		var tokenSet *gaeAccessToken.TokenSet
 		var err error
 		port := freeport.GetPort() // 7777
 		redirectURI := fmt.Sprintf("http://localhost:%d", port)
-		auth := new(authenticate.Authenticate)
-		auth.RequestAuthentication(login.parentWindow, login.scope, login.clientID,
+		gaeAuthenticate.RequestAuthentication(login.parentWindow, login.scope, login.clientID,
 			port, redirectURI, func(code string) {
-				fmt.Printf("Code obtained %s\n", code)
+				logrus.WithField("Code obtained", code).Debug("gaeAuthenticate.RequestAuthentication() result")
 				if code != "" {
-					tokenSet, err = RequestAccessToken(code, login.clientID,
+					tokenSet, err = gaeAccessToken.RequestAccessToken(code, login.clientID,
 						login.clientSecret, redirectURI)
 
 					if err != nil {
-						log.Fatal("Unable to exchange code for token:", err)
+						logrus.WithError(err).Error("Unable to exchange code for token")
 					}
 					if tokenSet != nil {
-						tokenSet.Print()
+						tokenSet.Log()
 					}
 				}
 			})
