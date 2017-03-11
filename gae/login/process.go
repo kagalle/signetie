@@ -2,7 +2,6 @@ package login
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gotk3/gotk3/gtk"
@@ -37,13 +36,12 @@ func NewGaeLogin(parentWindow *gtk.Window, scope string, clientID string, client
 // The input tokenSet may be nil.
 func (login *GaeLogin) Login(tokenSet *gaeAccessToken.TokenSet) *gaeAccessToken.TokenSet {
 	// Determine if the accessToken in the tokenSet is stil valid.
-	if (tokenSet != nil) &&
-		(tokenSet.AccessToken != "") &&
-		(tokenSet.ExpiresOn.After(time.Now())) {
-
+	tokenState := tokenSet.GetState()
+	switch tokenState.GetCurrent() {
+	case gaeAccessToken.Active:
 		// The current accessToken should still work
 		return tokenSet
-	} else if (tokenSet != nil) && (tokenSet.RefreshToken != "") {
+	case gaeAccessToken.Refresh:
 		// Attempt to use the refreshToken to get a new accessToken
 		// TODO
 		/*
@@ -58,8 +56,8 @@ func (login *GaeLogin) Login(tokenSet *gaeAccessToken.TokenSet) *gaeAccessToken.
 			grant_type=refresh_token
 		*/
 		return nil
-	} else {
-		// Nothing in the current tokenSet that I can use - get a new one
+	default:
+		// There is nothing in the current tokenSet that I can use - get a new one
 		var tokenSet *gaeAccessToken.TokenSet
 		var err error
 		port := freeport.GetPort() // 7777
@@ -81,5 +79,4 @@ func (login *GaeLogin) Login(tokenSet *gaeAccessToken.TokenSet) *gaeAccessToken.
 			})
 		return tokenSet
 	}
-
 }

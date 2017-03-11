@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/kagalle/go-enum/enum"
 )
 
 // TokenSet is what is needed to access a GAE API.
@@ -23,4 +24,34 @@ func (p *TokenSet) Log() {
 		"IDToken":      p.IDToken,
 		"refreshToken": p.RefreshToken,
 		"expiresOn":    p.ExpiresOn}).Debug("TokenSet")
+}
+
+func (tokenSet *TokenSet) GetState() TokenState {
+	tokenState := NewTokenState([]int{Active, Refresh, Expired}, Expired)
+	if (tokenSet != nil) &&
+		(tokenSet.AccessToken != "") &&
+		(tokenSet.ExpiresOn.After(time.Now())) {
+
+		tokenState.Set(Active)
+	} else if (tokenSet != nil) && (tokenSet.RefreshToken != "") {
+		tokenState.Set(Refresh)
+	}
+	return *tokenState
+}
+
+const (
+	Active  = iota // should be active, attempt to use as-is
+	Refresh = iota // use refresh token to renew the token
+	Expired = iota // expired or refresh token not available
+)
+
+type TokenState struct {
+	*enum.Enumint
+}
+
+// this needs to be duplicated for each enum type
+func NewTokenState(valuesMap []int, current int) *TokenState {
+	state := new(TokenState)
+	state.Enumint = enum.NewEnumint(valuesMap, current)
+	return state
 }
