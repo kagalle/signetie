@@ -43,7 +43,6 @@ func (login *GaeLogin) Login(tokenSet *gaeAccessToken.TokenSet) *gaeAccessToken.
 		return tokenSet
 	case gaeAccessToken.Refresh:
 		// Attempt to use the refreshToken to get a new accessToken
-		// TODO
 		/*
 					https://developers.google.com/identity/protocols/OAuth2InstalledApp#offline
 					POST /oauth2/v4/token HTTP/1.1
@@ -55,7 +54,15 @@ func (login *GaeLogin) Login(tokenSet *gaeAccessToken.TokenSet) *gaeAccessToken.
 			refresh_token=<refresh_token>&
 			grant_type=refresh_token
 		*/
-		return nil
+		var err error
+		tokenSet, err = gaeAccessToken.RefreshAccessToken(tokenSet, login.clientID, login.clientSecret)
+		if err != nil {
+			logrus.WithError(err).Error("Unable to refresh token")
+		}
+		if tokenSet != nil {
+			tokenSet.Log("Refresh tokenSet")
+		}
+		return tokenSet
 	default:
 		// There is nothing in the current tokenSet that I can use - get a new one
 		var tokenSet *gaeAccessToken.TokenSet
@@ -73,7 +80,7 @@ func (login *GaeLogin) Login(tokenSet *gaeAccessToken.TokenSet) *gaeAccessToken.
 						logrus.WithError(err).Error("Unable to exchange code for token")
 					}
 					if tokenSet != nil {
-						tokenSet.Log()
+						tokenSet.Log("Create new tokenSet")
 					}
 				}
 			})

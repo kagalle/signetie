@@ -18,12 +18,12 @@ type TokenSet struct {
 	ExpiresOn    time.Time
 }
 
-func (p *TokenSet) Log() {
+func (p *TokenSet) Log(s string) {
 	logrus.WithFields(logrus.Fields{
 		"accessToken":  p.AccessToken,
 		"IDToken":      p.IDToken,
 		"refreshToken": p.RefreshToken,
-		"expiresOn":    p.ExpiresOn}).Debug("TokenSet")
+		"expiresOn":    p.ExpiresOn}).Debug(s)
 }
 
 func (tokenSet *TokenSet) GetState() TokenState {

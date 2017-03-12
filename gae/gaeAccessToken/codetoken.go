@@ -1,6 +1,7 @@
 package gaeAccessToken
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -31,14 +32,50 @@ func RequestAccessToken(authCode string, clientID string, clientSecret string,
 		return nil, errors.WrapPrefix(err, "Unable to convert code into token", 0)
 	}
 	defer resp.Body.Close()
-	decoder := json.NewDecoder(resp.Body)
+	// http://stackoverflow.com/a/9649061/3728147
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(resp.Body)
+	jsonData := buf.Bytes()
+	tokenSet := new(TokenSet)
+	tokenSet, err = ParseTokenSetFromJson(jsonData, nil)
+	return tokenSet, nil
+}
+
+// RefreshAccessToken uses the refresh token to renew an access token.
+func RefreshAccessToken(tokenSet *TokenSet, clientID string, clientSecret string) (*TokenSet, error) {
+
+	params := url.Values{}
+	// state := util.RandomDataBase64url(32)
+	params.Set("refresh_token", tokenSet.RefreshToken)
+	params.Set("client_id", clientID)
+	params.Set("client_secret", clientSecret)
+	params.Set("grant_type", "refresh_token")
+	// params.Set("state", state)
+	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v4/token", params)
+	if err != nil {
+		return nil, errors.WrapPrefix(err, "Unable to refresh token", 0)
+	}
+	defer resp.Body.Close()
+	// http://stackoverflow.com/a/9649061/3728147
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(resp.Body)
+	jsonData := buf.Bytes()
+	tokenSet, err = ParseTokenSetFromJson(jsonData, tokenSet)
+	return tokenSet, nil
+}
+
+// supplied tokenSet may be nil, in which case a new one will be created.
+func ParseTokenSetFromJson(jsonData []byte, tokenSet *TokenSet) (*TokenSet, error) {
 	var jsonResponse responseData
-	err = decoder.Decode(&jsonResponse)
+	err := json.Unmarshal(jsonData, &jsonResponse)
 	if err != nil {
 		return nil, errors.WrapPrefix(err, "Unable to parse token response", 0)
 	}
 	logrus.WithFields(logrus.Fields{"response": jsonResponse}).Debug("")
-	tokenSet := new(TokenSet)
+
+	if tokenSet == nil {
+		tokenSet = new(TokenSet)
+	}
 	tokenSet.AccessToken = jsonResponse.AccessToken
 	tokenSet.IDToken = jsonResponse.IDToken
 	tokenSet.RefreshToken = jsonResponse.RefreshToken

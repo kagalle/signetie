@@ -3,15 +3,18 @@ package main
 import (
 	"errors"
 	"runtime"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gotk3/gotk3/gtk"
+	"github.com/kagalle/signetie/client_golang/gae/gaeAccessToken"
 	"github.com/kagalle/signetie/client_golang/gae/login"
 )
 
 func init() {
 	// Ref Re: logging: https://dave.cheney.net/2015/11/05/lets-talk-about-logging
 	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetFormatter(new(logrus.JSONFormatter))
 }
 
 func main() {
@@ -59,9 +62,15 @@ func main() {
 			"https://www.googleapis.com/auth/userinfo.profile",                         // scope
 			"192820621204-nrkum19gt8a7hjrrkrdpdhh2qgmi0toq.apps.googleusercontent.com", // clientID
 			"Tx3wbyqLBjDFOH7l-ZXr7-Ot")                                                 // client secret
-		tokenSet := gaeLogin.Login(nil)
+		// tokenSet := gaeLogin.Login(nil)
+		tokenSet := new(gaeAccessToken.TokenSet)
+		tokenSet.RefreshToken = "1/RGB7a-XXwgdtXODhN85dORAMPpCD62gKYucv4fkNVW0"
+		location, _ := time.LoadLocation("America/New_York")
+		tokenSet.ExpiresOn = time.Date(2017, time.March, 12, 12, 20, 9, 75240, location)
+		tokenSet.Log("Test tokenset with manual refresh token")
+		tokenSet = gaeLogin.Login(tokenSet)
 		if tokenSet != nil {
-			tokenSet.Log()
+			tokenSet.Log("TokenSet returned from refresh tokenset")
 		}
 	})
 	vbox.Add(runButton)
