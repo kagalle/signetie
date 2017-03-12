@@ -7,8 +7,10 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gotk3/gotk3/gtk"
+	"github.com/kagalle/signetie/client_golang/config"
 	"github.com/kagalle/signetie/client_golang/gae/gaeAccessToken"
 	"github.com/kagalle/signetie/client_golang/gae/login"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -34,6 +36,8 @@ func main() {
 			logrus.WithError(err).Error("Panic")
 		}
 	}()
+	// initialize configuration
+	config.InitConfiguration()
 	// Initialize GTK without parsing any command line arguments.
 	runtime.LockOSThread()
 	gtk.Init(nil)
@@ -58,14 +62,19 @@ func main() {
 		logrus.WithError(err).Error("Unable to create run button")
 	}
 	runButton.Connect("clicked", func() {
-		gaeLogin := login.NewGaeLogin(win,
-			"https://www.googleapis.com/auth/userinfo.profile",                         // scope
-			"192820621204-nrkum19gt8a7hjrrkrdpdhh2qgmi0toq.apps.googleusercontent.com", // clientID
-			"Tx3wbyqLBjDFOH7l-ZXr7-Ot")                                                 // client secret
+		/*        "gae_login_scope":   "https://www.googleapis.com/auth/userinfo.profile",
+		"gae_client_id":     "xxxx.apps.googleusercontent.com",
+		"gae_client_secret": "xxxx",
+		"gae_test_refresh_token":  "xxxx",
+		"location_timezone": "America/New_York"
+		*/
+		gaeLogin := login.NewGaeLogin(win, viper.GetString("gae_login_scope"),
+			viper.GetString("gae_client_id"),
+			viper.GetString("gae_client_secret"))
 		// tokenSet := gaeLogin.Login(nil)
 		tokenSet := new(gaeAccessToken.TokenSet)
-		tokenSet.RefreshToken = "1/RGB7a-XXwgdtXODhN85dORAMPpCD62gKYucv4fkNVW0"
-		location, _ := time.LoadLocation("America/New_York")
+		tokenSet.RefreshToken = viper.GetString("gae_test_refresh_token")
+		location, _ := time.LoadLocation(viper.GetString("location_timezone"))
 		tokenSet.ExpiresOn = time.Date(2017, time.March, 12, 12, 20, 9, 75240, location)
 		tokenSet.Log("Test tokenset with manual refresh token")
 		tokenSet = gaeLogin.Login(tokenSet)
