@@ -1,0 +1,60 @@
+client_golang packages
+----------------------
+
+dependencies
+------------
+
+main
+    gae/login
+
+config
+
+gae/login
+    gae/gaeAuthenticate
+        gae/gaeAuthenticateHttpServer
+        gae/util
+    gae/gaeAccessToken
+
+
+
+
+
+
+provides
+--------
+
+config/settings.go
+
+gae/login/process.go
+    type GaeLogin struct
+    func NewGaeLogin(parentWindow *gtk.Window, scope string, clientID string, clientSecret string) *GaeLogin
+    func (login *GaeLogin) Login(tokenSet *gaeAccessToken.TokenSet) *gaeAccessToken.TokenSet
+
+gae/gaeAuthenticate/process.go
+    type AuthCompleteCallback func(code string)
+    func RequestAuthentication(parentWindow *gtk.Window, scope string, clientID string, port int, redirectURI string, callback AuthCompleteCallback) error
+    func formAuthURL(scope string, clientID string, redirectURI string, state string) string
+
+gae/gaeAuthenticateHttpServer/server.go
+    type authServerCallback func(code string)
+    type AuthServer struct
+    func NewAuthServer(port int, state string, callback authServerCallback) *AuthServer
+    func (p *AuthServer) ServeHTTP(w http.ResponseWriter, r *http.Request)
+    func (p *AuthServer) BlockingClose()
+    func (p *AuthServer) ListenAndServe()
+
+gae/util/statestring.go
+    func RandomDataBase64url(length int) string
+
+gae/gaeAccessToken/codetoken.go
+    func RequestAccessToken(authCode string, clientID string, clientSecret string, redirectURI string) (*TokenSet, error)
+
+gae/gaeAccessToken/codetoken_test.go
+    func TestJsonDecoder(t *testing.T)
+
+gae/gaeAccessToken/responsedata.go
+    type responseData struct
+
+gae/gaeAccessToken/tokenset.go
+    type TokenSet struct
+    func (p *TokenSet) Log()

@@ -1,0 +1,7 @@
+{
+	"gae_login_scope":   "https://www.googleapis.com/auth/userinfo.profile",
+	"gae_client_id":     "xxxx.apps.googleusercontent.com",
+	"gae_client_secret": "xxxx",
+	"gae_test_refresh_token":  "xxxx",
+	"location_timezone": "America/New_York"
+}

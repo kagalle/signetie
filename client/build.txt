@@ -1,0 +1,4 @@
+ken@asusdeb:~/go/src/github.com/kagalle/signetie/client_golang$
+
+go build main.go
+./main
